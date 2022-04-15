@@ -20,14 +20,13 @@ let elapsedTime
 const ELEMENT_BYTES = 4
 const readBuffer = (outputBuffer, index) => {
   const offset = outputBuffer / ELEMENT_BYTES
-  return Module.HEAP32.subarray(offset + index, offset + index + 1)[0]
+  return Module.HEAP32[offset + index]
 }
 
-const readAttribute = (buffer, count) => {
-  Module._doFree(buffer)
+const readAttribute = (buffer, size) => {
   return Module.HEAPF32.slice(
     buffer / ELEMENT_BYTES,
-    buffer / ELEMENT_BYTES + count
+    buffer / ELEMENT_BYTES + size
   )
 }
 
@@ -38,11 +37,12 @@ export default (e) => {
   const physics = usePhysics()
   gl.outputEncoding = THREE.sRGBEncoding
   const positionCount = 10
-  const outputBuffer = Module._generateVertices(positionCount)
+  const outputBuffer = Module._generateVertices(10, 10, 10)
   const vertexCount = readBuffer(outputBuffer, 0)
   const positionBuffer = readBuffer(outputBuffer, 1)
   const positions = readAttribute(positionBuffer, vertexCount * 3)
-  console.log(positions)
+  Module._doFree(positionBuffer)
+  Module._doFree(outputBuffer)
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   const material = new THREE.MeshBasicMaterial({
