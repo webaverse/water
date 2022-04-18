@@ -12,22 +12,29 @@ const { useApp, useLoaders, useFrame, useCleanup, usePhysics, useInternals } =
 const baseUrl = import.meta.url.replace(/(\/)[^\/\/]*$/, '$1')
 
 let physicsIds = []
-let elapsedTime
+class BufferManager {
+  constructor() {
+    this.ELEMENT_BYTES = 4
+  }
 
-// let rotationAnimation = false
-// let lastRotationNumber = 0
+  readBuffer(outputBuffer, index) {
+    const offset = outputBuffer / this.ELEMENT_BYTES
+    return Module.HEAP32[offset + index]
+  }
 
-const ELEMENT_BYTES = 4
-const readBuffer = (outputBuffer, index) => {
-  const offset = outputBuffer / ELEMENT_BYTES
-  return Module.HEAP32[offset + index]
-}
+  readAttribute(buffer, size) {
+    return Module.HEAPF32.slice(
+      buffer / this.ELEMENT_BYTES,
+      buffer / this.ELEMENT_BYTES + size
+    )
+  }
 
-const readAttribute = (buffer, size) => {
-  return Module.HEAPF32.slice(
-    buffer / ELEMENT_BYTES,
-    buffer / ELEMENT_BYTES + size
-  )
+  readIndices(buffer, size) {
+    return Module.HEAPU32.slice(
+      buffer / this.ELEMENT_BYTES,
+      buffer / this.ELEMENT_BYTES + size
+    )
+  }
 }
 
 export default (e) => {
@@ -36,30 +43,52 @@ export default (e) => {
   const gl = useInternals().renderer
   const physics = usePhysics()
   gl.outputEncoding = THREE.sRGBEncoding
-  const positionCount = 10
-  const outputBuffer = Module._generateVertices(10, 10, 10)
-  const vertexCount = readBuffer(outputBuffer, 0)
-  const positionBuffer = readBuffer(outputBuffer, 1)
-  const positions = readAttribute(positionBuffer, vertexCount * 3)
+
+  const outputBuffer = Module._createChunk()
+
+  const bufferManager = new BufferManager()
+
+  // the order is defined in C++
+  const positionCount = bufferManager.readBuffer(outputBuffer, 0)
+  const positionBuffer = bufferManager.readBuffer(outputBuffer, 1)
+
+  const normalCount = bufferManager.readBuffer(outputBuffer, 2)
+  const normalBuffer = bufferManager.readBuffer(outputBuffer, 3)
+
+  const indicesCount = bufferManager.readBuffer(outputBuffer, 4)
+  const indicesBuffer = bufferManager.readBuffer(outputBuffer, 5)
+
+  const positions = bufferManager.readAttribute(
+    positionBuffer,
+    positionCount * 3
+  )
+
+  const normals = bufferManager.readAttribute(normalBuffer, normalCount * 3)
+
+  const indices = bufferManager.readIndices(indicesBuffer, indicesCount)
+
   Module._doFree(positionBuffer)
+  Module._doFree(normalBuffer)
+  Module._doFree(indicesBuffer)
   Module._doFree(outputBuffer)
+
   const geometry = new THREE.BufferGeometry()
+
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1))
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+
   const material = new THREE.MeshBasicMaterial({
-    color: 0xff0000,
-    // wireframe: true,
+    color: '#145734',
+    wireframe: true,
   })
+
   const mesh = new THREE.Mesh(geometry, material)
 
   app.add(mesh)
 
-  const groundGeometry = new THREE.PlaneGeometry(100, 100)
-  const ground = new THREE.Mesh(groundGeometry)
-  ground.position.set(0, -2, 0)
-  ground.rotation.x -= Math.PI / 2
-  ground.updateMatrixWorld()
-  const groundPhysics = physics.addGeometry(ground)
-  physicsIds.push(groundPhysics)
+  const terrainPhysics = physics.addGeometry(mesh)
+  physicsIds.push(terrainPhysics)
 
   useFrame(({ timestamp }) => {})
   useCleanup(() => {
