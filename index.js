@@ -18,7 +18,7 @@ export default (e) => {
   const physics = usePhysics()
 
   setTimeout(() => {
-    const { positions, normals, indices } = physics.createChunk(-32, 0, -32)
+    const { positions, normals, indices } = physics.createChunkWithDualContouring(-32, 0, -32)
 
     const geometry = new THREE.BufferGeometry()
 
@@ -40,7 +40,7 @@ export default (e) => {
   }, 100)
 
   setTimeout(() => {
-    const { positions, normals, indices } = physics.createChunk(32, 0, -32)
+    const { positions, normals, indices } = physics.createChunkWithDualContouring(32, 0, -32)
 
     const geometry = new THREE.BufferGeometry()
 
@@ -62,7 +62,7 @@ export default (e) => {
   }, 100)
 
   setTimeout(() => {
-    const { positions, normals, indices } = physics.createSeam(-32, 0, -32)
+    const { positions, normals, indices } = physics.createSeamsWithDualContouring(-32, 0, -32)
 
     const geometry = new THREE.BufferGeometry()
 
@@ -84,7 +84,7 @@ export default (e) => {
   }, 100)
 
   // setTimeout(() => {
-  //   const { positions, normals, indices } = physics.createChunk(-32, 0, 32)
+  //   const { positions, normals, indices } = physics.createChunkWithDualContouring(-32, 0, 32)
 
   //   const geometry = new THREE.BufferGeometry()
 
@@ -105,7 +105,7 @@ export default (e) => {
   //   physicsIds.push(terrainPhysics)
   // }, 3000)
   // setTimeout(() => {
-  //   const { positions, normals, indices } = physics.createChunk(32, 0, 32)
+  //   const { positions, normals, indices } = physics.createChunkWithDualContouring(32, 0, 32)
 
   //   const geometry = new THREE.BufferGeometry()
 
