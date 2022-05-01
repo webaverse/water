@@ -17,8 +17,9 @@ export default (e) => {
   app.name = 'neon-club'
   const physics = usePhysics()
 
-  setTimeout(() => {
-    const { positions, normals, indices } = physics.createChunkWithDualContouring(-32, 0, -32)
+  const addChunk = (origin, lod) => {
+    const { positions, normals, indices } =
+      physics.createChunkWithDualContouring(origin.x, origin.y, origin.z, lod)
 
     const geometry = new THREE.BufferGeometry()
 
@@ -37,32 +38,11 @@ export default (e) => {
 
     const terrainPhysics = physics.addGeometry(mesh)
     physicsIds.push(terrainPhysics)
-  }, 100)
+  }
 
-  setTimeout(() => {
-    const { positions, normals, indices } = physics.createChunkWithDualContouring(32, 0, -32)
-
-    const geometry = new THREE.BufferGeometry()
-
-    geometry.setIndex(new THREE.BufferAttribute(indices, 1))
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-
-    const material = new THREE.MeshBasicMaterial({
-      color: '#840e06',
-      wireframe: true,
-    })
-
-    const mesh = new THREE.Mesh(geometry, material)
-
-    app.add(mesh)
-
-    const terrainPhysics = physics.addGeometry(mesh)
-    physicsIds.push(terrainPhysics)
-  }, 100)
-
-  setTimeout(() => {
-    const { positions, normals, indices } = physics.createSeamsWithDualContouring(-32, 0, -32)
+  const addSeam = (origin) => {
+    const { positions, normals, indices } =
+      physics.createSeamsWithDualContouring(origin.x, origin.y, origin.z)
 
     const geometry = new THREE.BufferGeometry()
 
@@ -81,50 +61,43 @@ export default (e) => {
 
     const terrainPhysics = physics.addGeometry(mesh)
     physicsIds.push(terrainPhysics)
-  }, 100)
+  }
 
-  // setTimeout(() => {
-  //   const { positions, normals, indices } = physics.createChunkWithDualContouring(-32, 0, 32)
+  // const min = -((64 * 3) / 2)
+  // const max = (64 * 3) / 2
 
-  //   const geometry = new THREE.BufferGeometry()
+  // for (let x = min; x < max; x += 64) {
+  //   for (let y = min; y < max; y += 64) {
+  //     for (let z = min; z < max; z += 64) {
+  //       addChunk(new THREE.Vector3(x, y, z), 1)
+  //     }
+  //   }
+  // }
+  // for (let x = min; x < max; x += 64) {
+  //   for (let y = min; y < max; y += 64) {
+  //     for (let z = min; z < max; z += 64) {
+  //       addSeam(new THREE.Vector3(x, y, z))
+  //     }
+  //   }
+  // }
 
-  //   geometry.setIndex(new THREE.BufferAttribute(indices, 1))
-  //   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  //   geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+  const chunkPosition1 = new THREE.Vector3(0, 0, 0)
+  const chunkPosition2 = new THREE.Vector3(64, 0, 0)
+  const chunkPosition3 = new THREE.Vector3(-64, 0, 0)
+  const chunkPosition4 = new THREE.Vector3(-128, 0, 0)
 
-  //   const material = new THREE.MeshBasicMaterial({
-  //     color: '#145734',
-  //     wireframe: true,
-  //   })
+  addChunk(chunkPosition1, 8)
+  addChunk(chunkPosition2, 2)
+  addChunk(chunkPosition3, 4)
+  addChunk(chunkPosition4, 1)
 
-  //   const mesh = new THREE.Mesh(geometry, material)
+  addSeam(chunkPosition1)
+  addSeam(chunkPosition2)
+  addSeam(chunkPosition3)
+  addSeam(chunkPosition4)
 
-  //   app.add(mesh)
-
-  //   const terrainPhysics = physics.addGeometry(mesh)
-  //   physicsIds.push(terrainPhysics)
-  // }, 3000)
-  // setTimeout(() => {
-  //   const { positions, normals, indices } = physics.createChunkWithDualContouring(32, 0, 32)
-
-  //   const geometry = new THREE.BufferGeometry()
-
-  //   geometry.setIndex(new THREE.BufferAttribute(indices, 1))
-  //   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  //   geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-
-  //   const material = new THREE.MeshBasicMaterial({
   //     color: '#840e06',
-  //     wireframe: true,
-  //   })
-
-  //   const mesh = new THREE.Mesh(geometry, material)
-
-  //   app.add(mesh)
-
-  //   const terrainPhysics = physics.addGeometry(mesh)
-  //   physicsIds.push(terrainPhysics)
-  // }, 3000)
+  //     color: '#145734',
 
   useFrame(({ timestamp }) => {})
 
