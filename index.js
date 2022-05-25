@@ -4,6 +4,7 @@
 /* eslint-disable linebreak-style */
 import metaversefile from 'metaversefile'
 import * as THREE from 'three'
+import { terrainVertex, terrainFragment } from './shaders/terrainShader'
 
 const { useApp, useLoaders, useFrame, useCleanup, usePhysics, useInternals } =
   metaversefile
@@ -16,88 +17,200 @@ export default (e) => {
   const app = useApp()
   app.name = 'neon-club'
   const physics = usePhysics()
+  const camera = useInternals().camera
+  // console.log(camera);
 
-  const addChunk = (origin, lod) => {
-    const { positions, normals, indices } =
-      physics.createChunkWithDualContouring(origin.x, origin.y, origin.z, lod)
+  //   color: '#f2b02c',
+
+  const generateChunk = (origin) => {
+    physics.generateChunkDataDualContouring(origin.x, origin.y, origin.z)
+  }
+
+  const setChunkLod = (origin, lod) => {
+    physics.setChunkLodDualContouring(origin.x, origin.y, origin.z, lod)
+  }
+
+  const clearChunkData = (origin) => {
+    physics.clearTemporaryChunkDataDualContouring()
+    physics.clearChunkRootDualContouring(origin.x, origin.y, origin.z)
+  }
+
+  const addChunk = (origin, y = 0) => {
+    const meshData = physics.createChunkMeshDualContouring(
+      origin.x,
+      origin.y,
+      origin.z
+    )
+
+    const { positions, normals, indices, biomes, biomesWeights } = meshData
+
+    if (!positions || !normals || !indices || !biomes || !biomesWeights) {
+      return
+    }
 
     const geometry = new THREE.BufferGeometry()
 
     geometry.setIndex(new THREE.BufferAttribute(indices, 1))
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+    geometry.setAttribute('biomes', new THREE.BufferAttribute(biomes, 4))
+    geometry.setAttribute(
+      'biomesWeights',
+      new THREE.BufferAttribute(biomesWeights, 4)
+    )
 
-    const material = new THREE.MeshBasicMaterial({
-      color: '#0822b4',
+    // console.log(geometry.attributes.biomes.getX(0));
+
+    const earthTexture = new THREE.TextureLoader().load(
+      baseUrl + 'assets/textures/EarthBaseColor1.png'
+    )
+    earthTexture.wrapS = earthTexture.wrapT = THREE.RepeatWrapping
+    earthTexture.encoding = THREE.sRGBEncoding
+    const earthNormal = new THREE.TextureLoader().load(
+      baseUrl + 'assets/textures/EarthNormal1.png'
+    )
+    earthNormal.wrapS = earthNormal.wrapT = THREE.RepeatWrapping
+
+    const grassTexture = new THREE.TextureLoader().load(
+      baseUrl + 'assets/textures/GrassBaseColor1.png'
+    )
+    grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping
+    const grassNormal = new THREE.TextureLoader().load(
+      baseUrl + 'assets/textures/GrassNormal1.png'
+    )
+    grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: terrainVertex,
+      fragmentShader: terrainFragment,
       wireframe: true,
+      vertexColors: true,
+      side: THREE.FrontSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uEarthBaseColor: {
+          value: earthTexture,
+        },
+        uGrassBaseColor: {
+          value: grassTexture,
+        },
+        uEarthNormal: {
+          value: earthNormal,
+        },
+        uGrassNormal: {
+          value: grassNormal,
+        },
+        // diffuseMap: {
+        //   value: {
+        //     textures: [
+        //       new THREE.TextureLoader(
+        //         baseUrl + '/assets/texture/EarthBaseColor.png'
+        //       ),
+        //       new THREE.TextureLoader(
+        //         baseUrl + '/assets/texture/GrassBaseColor.png'
+        //       ),
+        //     ],
+        //   },
+        // },
+        // normalMap: {
+        //   value: {
+        //     textures: [
+        //       new THREE.TextureLoader(
+        //         baseUrl + '/assets/texture/EarthNormal.png'
+        //       ),
+        //       new THREE.TextureLoader(
+        //         baseUrl + '/assets/texture/GrassNormal.png'
+        //       ),
+        //     ],
+        //   },
+        // },
+        noiseMap: {
+          value: new THREE.TextureLoader().load(
+            baseUrl + '/assets/texture/noiseMap.png'
+          ),
+        },
+        uResolution: {
+          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        },
+        uTexture: { value: null },
+      },
     })
 
     const mesh = new THREE.Mesh(geometry, material)
+
+    mesh.position.y = y
 
     app.add(mesh)
 
     const terrainPhysics = physics.addGeometry(mesh)
     physicsIds.push(terrainPhysics)
+
+    clearChunkData(origin)
   }
 
-  const addSeam = (origin) => {
-    const { positions, normals, indices } =
-      physics.createSeamsWithDualContouring(origin.x, origin.y, origin.z)
+  const chunkGridNumber = 1
 
-    const geometry = new THREE.BufferGeometry()
+  const min = -((64 * chunkGridNumber) / 2)
+  const max = (64 * chunkGridNumber) / 2
 
-    geometry.setIndex(new THREE.BufferAttribute(indices, 1))
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+  const chunkLocalPosition = new THREE.Vector3()
 
-    const material = new THREE.MeshBasicMaterial({
-      color: '#f58814',
-      wireframe: true,
-    })
+  // generate the chunk data
 
-    const mesh = new THREE.Mesh(geometry, material)
-
-    app.add(mesh)
-
-    const terrainPhysics = physics.addGeometry(mesh)
-    physicsIds.push(terrainPhysics)
+  for (let x = min; x < max; x += 64) {
+    for (let y = min; y < max; y += 64) {
+      for (let z = min; z < max; z += 64) {
+        chunkLocalPosition.set(x + 32, y + 32, z + 32)
+        generateChunk(chunkLocalPosition)
+        console.log(
+          'Generating : ' +
+            chunkLocalPosition.x +
+            ', ' +
+            chunkLocalPosition.y +
+            ', ' +
+            chunkLocalPosition.z
+        )
+      }
+    }
   }
 
-  // const min = -((64 * 3) / 2)
-  // const max = (64 * 3) / 2
+  // set the lod (switching lod)
 
-  // for (let x = min; x < max; x += 64) {
-  //   for (let y = min; y < max; y += 64) {
-  //     for (let z = min; z < max; z += 64) {
-  //       addChunk(new THREE.Vector3(x, y, z), 1)
-  //     }
-  //   }
-  // }
-  // for (let x = min; x < max; x += 64) {
-  //   for (let y = min; y < max; y += 64) {
-  //     for (let z = min; z < max; z += 64) {
-  //       addSeam(new THREE.Vector3(x, y, z))
-  //     }
-  //   }
-  // }
+  for (let x = min; x < max; x += 64) {
+    for (let y = min; y < max; y += 64) {
+      for (let z = min; z < max; z += 64) {
+        const lod = Math.abs(Math.max(x, y, z)) / 64
+        chunkLocalPosition.set(x + 32, y + 32, z + 32)
+        setChunkLod(chunkLocalPosition, 1)
+        console.log(
+          'Setting Lod : ' +
+            chunkLocalPosition.x +
+            ', ' +
+            chunkLocalPosition.y +
+            ', ' +
+            chunkLocalPosition.z
+        )
+      }
+    }
+  }
 
-  const chunkPosition1 = new THREE.Vector3(0, 0, 0)
-  const chunkPosition2 = new THREE.Vector3(64, 0, 0)
-  const chunkPosition3 = new THREE.Vector3(-64, 0, 0)
-  const chunkPosition4 = new THREE.Vector3(-128, 0, 0)
-
-  addChunk(chunkPosition1, 8)
-  addChunk(chunkPosition2, 2)
-  addChunk(chunkPosition3, 4)
-  addChunk(chunkPosition4, 1)
-
-  addSeam(chunkPosition1)
-  addSeam(chunkPosition2)
-  addSeam(chunkPosition3)
-  addSeam(chunkPosition4)
-
-  //     color: '#840e06',
-  //     color: '#145734',
+  // adding the chunk to the scene
+  for (let x = min; x < max; x += 64) {
+    for (let y = min; y < max; y += 64) {
+      for (let z = min; z < max; z += 64) {
+        chunkLocalPosition.set(x + 32, y + 32, z + 32)
+        addChunk(chunkLocalPosition, -40)
+        console.log(
+          'Adding Chunk : ' +
+            chunkLocalPosition.x +
+            ', ' +
+            chunkLocalPosition.y +
+            ', ' +
+            chunkLocalPosition.z
+        )
+      }
+    }
+  }
 
   useFrame(({ timestamp }) => {})
 
