@@ -4,7 +4,7 @@
 /* eslint-disable linebreak-style */
 import metaversefile from 'metaversefile'
 import * as THREE from 'three'
-import { terrainVertex, terrainFragment } from './shaders/terrainShader'
+import { terrainVertex, terrainFragment } from './shaders/terrainShader.js'
 
 const { useApp, useLoaders, useFrame, useCleanup, usePhysics, useInternals } =
   metaversefile
