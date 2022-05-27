@@ -148,7 +148,7 @@ export default (e) => {
     clearChunkData(origin)
   }
 
-  const chunkGridNumber = 2
+  const chunkGridNumber = 1
 
   const min = -((64 * chunkGridNumber) / 2)
   const max = (64 * chunkGridNumber) / 2

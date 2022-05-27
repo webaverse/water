@@ -2,13 +2,13 @@ import * as THREE from 'three'
 
 const terrainVertex = `
       ${THREE.ShaderChunk.common}
-      attribute ivec4 biomes;
+      attribute vec4 biomes;
       attribute vec4 biomesWeights;
       varying vec2 vUv;
       varying vec3 vNormal;
       varying vec3 vPosition;
       flat varying ivec4 vBiomes;
-      varying vec4 vBiomesWeights;
+      flat varying vec4 vBiomesWeights;
       uniform vec2 uResolution;
       uniform float uTime;
       uniform sampler2D uTexture;
@@ -18,7 +18,7 @@ void main() {
   vUv = uv;
   vNormal = normal;
   vPosition = position;
-  vBiomes = biomes;
+  vBiomes = ivec4(biomes);
   vBiomesWeights = biomesWeights;
   vec4 modelPosition = modelMatrix * vec4(position, 1.0);
   vec4 viewPosition = viewMatrix * modelPosition;
@@ -41,7 +41,7 @@ const terrainFragment = `
   varying vec3 vNormal;
   varying vec3 vPosition;
   flat varying ivec4 vBiomes;
-  varying vec4 vBiomesWeights;
+  flat varying vec4 vBiomesWeights;
   uniform vec2 uResolution;
   uniform sampler2DArray diffuseMap;
   uniform sampler2DArray normalMap;
@@ -206,28 +206,30 @@ vec4 computeLighting(vec3 worldSpaceNormal, vec3 sunDir, vec3 viewDirection) {
     return vec4(worldNormal, 0.0);
   }
 
-  vec4 terrainBlend(vec4 samples[4], vec4 weights) {
+  vec4 terrainBlend(vec4 samples[4]) {
     vec4 a = samples[0];
     vec4 b = samples[1];
     vec4 c = samples[2];
     vec4 d = samples[3];
 
-    float weightSum = weights.x + weights.y + weights.z + weights.w;
-    return (a*weights.x + b*weights.y + c*weights.z + d*weights.w) / weightSum;
+    float weightSum = a.w + b.w + c.w + d.w;
+    return (a*a.w + b*b.w + c*c.w + d*d.w) / weightSum;
 }
 
-  void setBiome(int biome, out vec4 diffuseSample,out vec4 normalSample){
+  void setBiome(int biome, float biomeWeight, out vec4 diffuseSample,out vec4 normalSample){
     if(biome == 4){
+
       float rockNoise = warpNoise(vPosition/10.0);
-      vec4 rockColor = vec4(vec3(0.36 , 0.2 , 0.06)*(.5 + rockNoise) , 1.);
+      vec4 rockColor = vec4(vec3(0.36 , 0.2 , 0.06)*(.5 + rockNoise) , biomeWeight);
       vec3 rockNormal = getNormalFromHeight(vPosition + vNormal * rockNoise);
 
       diffuseSample = rockColor;
-      normalSample = vec4(rockNormal,1.);
+      normalSample = vec4(rockNormal,biomeWeight);
+      
     }else{
       // default color is red
-      diffuseSample = vec4(1, 0 , 0, 1.);
-      normalSample = vec4(1,1,1,1.);
+      diffuseSample = vec4(1, 0 , 0, biomeWeight);
+      normalSample = vec4(1,1,1,biomeWeight);
     }
   
   }
@@ -237,17 +239,18 @@ vec4 computeLighting(vec3 worldSpaceNormal, vec3 sunDir, vec3 viewDirection) {
     vec4 diffuseSamples[4];
     vec4 normalSamples[4];
 
+
     vec3 worldPosition = (modelMatrix * vec4(vPosition, 1)).xyz;
     vec3 eyeDirection = normalize(worldPosition - cameraPosition);
     vec3 sunDir = normalize(vec3(1, 0, 0));
 
-    setBiome(vBiomes.x, diffuseSamples[0], normalSamples[0]);
-    setBiome(vBiomes.y, diffuseSamples[1], normalSamples[1]);
-    setBiome(vBiomes.z, diffuseSamples[2], normalSamples[2]);
-    setBiome(vBiomes.w, diffuseSamples[3], normalSamples[3]);
+    setBiome(vBiomes.x, vBiomesWeights.x ,diffuseSamples[0],normalSamples[0]);
+    setBiome(vBiomes.y, vBiomesWeights.y ,diffuseSamples[1],normalSamples[1]);
+    setBiome(vBiomes.z, vBiomesWeights.z ,diffuseSamples[2],normalSamples[2]);
+    setBiome(vBiomes.w, vBiomesWeights.w ,diffuseSamples[3],normalSamples[3]);
  
-    vec4 diffuseBlended = terrainBlend(diffuseSamples,vBiomesWeights);
-    vec4 normalBlended = terrainBlend(normalSamples,vec4(1));
+    vec4 diffuseBlended = terrainBlend(diffuseSamples);
+    vec4 normalBlended = terrainBlend(normalSamples);
 
     vec3 worldSpaceNormal = normalize(normalBlended.xyz);
     vec4 lighting = computeLighting(worldSpaceNormal, sunDir, -eyeDirection);
