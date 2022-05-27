@@ -59,7 +59,7 @@ export default (e) => {
       new THREE.BufferAttribute(biomesWeights, 4)
     )
 
-    // console.log(geometry.attributes.biomesWeights.getX(0));
+    // console.log(geometry.attributes.biomes.getX(0));
 
     const earthTexture = new THREE.TextureLoader().load(
       baseUrl + 'assets/textures/EarthBaseColor1.png'
@@ -83,7 +83,7 @@ export default (e) => {
     const material = new THREE.ShaderMaterial({
       vertexShader: terrainVertex,
       fragmentShader: terrainFragment,
-      // wireframe: true,
+      wireframe: true,
       vertexColors: true,
       side: THREE.FrontSide,
       uniforms: {
