@@ -35,8 +35,7 @@ const makeTerrainChunk = (chunk, physics) => {
   localVector.copy(chunk).multiplyScalar(chunkWorldSize);
   generateChunkMesh(localVector, physics);
   setChunkLod(localVector, 1, physics);
-  
-  const meshData = physics.createChunkMeshDualContouring(chunk.x, chunk.y, chunk.z);
+  const meshData = physics.createChunkMeshDualContouring(localVector.x, localVector.y, localVector.z);
   if (meshData) { // non-empty chunk
     const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
 
