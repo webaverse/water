@@ -189,6 +189,8 @@ export default e => {
 
   app.name = 'dual-contouring-terrain';
 
+  physics.setChunkSize(chunkWorldSize);
+
   const generator = new TerrainChunkGenerator(this, physics);
   const tracker = new LodChunkTracker(generator, {
     chunkWorldSize,
