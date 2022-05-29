@@ -10,18 +10,19 @@ const { useApp, useLoaders, useFrame, useCleanup, usePhysics, useCamera, useInte
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
-const physicsIds = []
+const chunkSize = 64;
+const minC = -1;
+const maxC = 1;
+const textureLoader = new THREE.TextureLoader();
 
 export default (e) => {
   const app = useApp()
   app.name = 'dual-contouring-terrain';
   const physics = usePhysics()
-  const camera = useCamera();
+  // const camera = useCamera();
   // console.log(camera);
 
-  const textureLoader = new THREE.TextureLoader();
-
-  //   color: '#f2b02c',
+  const physicsIds = []
 
   const generateChunk = (origin) => {
     physics.generateChunkDataDualContouring(origin.x, origin.y, origin.z)
@@ -41,120 +42,109 @@ export default (e) => {
       origin.x,
       origin.y,
       origin.z
-    )
+    );
+    if (meshData) { // non-empty chunk
+      const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
 
-    const { positions, normals, indices, biomes, biomesWeights } = meshData
+      const geometry = new THREE.BufferGeometry()
 
-    // if the chunk had no points
-    if (!positions || !normals || !indices || !biomes || !biomesWeights) {
-      return
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+      geometry.setAttribute('biomes', new THREE.BufferAttribute(biomes, 4))
+      geometry.setAttribute('biomesWeights', new THREE.BufferAttribute(biomesWeights, 4))
+      geometry.setIndex(new THREE.BufferAttribute(indices, 1))
+
+      // XXX need to Module._free the bufferAddress
+
+      const earthTexture = textureLoader.load(
+        baseUrl + 'assets/textures/EarthBaseColor1.png'
+      )
+      earthTexture.wrapS = earthTexture.wrapT = THREE.RepeatWrapping
+      earthTexture.encoding = THREE.sRGBEncoding
+      const earthNormal = textureLoader.load(
+        baseUrl + 'assets/textures/EarthNormal1.png'
+      )
+      earthNormal.wrapS = earthNormal.wrapT = THREE.RepeatWrapping
+
+      const grassTexture = textureLoader.load(
+        baseUrl + 'assets/textures/GrassBaseColor1.png'
+      )
+      grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping
+      const grassNormal = textureLoader.load(
+        baseUrl + 'assets/textures/GrassNormal1.png'
+      )
+      grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping
+
+      const material = new THREE.ShaderMaterial({
+        vertexShader: terrainVertex,
+        fragmentShader: terrainFragment,
+        // wireframe: true,
+        vertexColors: true,
+        side: THREE.FrontSide,
+        uniforms: {
+          uTime: { value: 0 },
+          uEarthBaseColor: {
+            value: earthTexture,
+          },
+          uGrassBaseColor: {
+            value: grassTexture,
+          },
+          uEarthNormal: {
+            value: earthNormal,
+          },
+          uGrassNormal: {
+            value: grassNormal,
+          },
+          // diffuseMap: {
+          //   value: {
+          //     textures: [
+          //       new THREE.TextureLoader(
+          //         baseUrl + '/assets/texture/EarthBaseColor.png'
+          //       ),
+          //       new THREE.TextureLoader(
+          //         baseUrl + '/assets/texture/GrassBaseColor.png'
+          //       ),
+          //     ],
+          //   },
+          // },
+          // normalMap: {
+          //   value: {
+          //     textures: [
+          //       new THREE.TextureLoader(
+          //         baseUrl + '/assets/texture/EarthNormal.png'
+          //       ),
+          //       new THREE.TextureLoader(
+          //         baseUrl + '/assets/texture/GrassNormal.png'
+          //       ),
+          //     ],
+          //   },
+          // },
+          noiseMap: {
+            value: textureLoader.load(
+              baseUrl + 'assets/textures/noiseMap.png'
+            ),
+          },
+          uResolution: {
+            value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+          },
+          uTexture: { value: null },
+        },
+      })
+
+      const mesh = new THREE.Mesh(geometry, material)
+
+      // mesh.position.y = y
+
+      app.add(mesh)
+
+      const terrainPhysics = physics.addGeometry(mesh)
+      physicsIds.push(terrainPhysics)
+
+      clearChunkData(origin)
     }
-
-    const geometry = new THREE.BufferGeometry()
-
-    geometry.setIndex(new THREE.BufferAttribute(indices, 1))
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-    geometry.setAttribute('biomes', new THREE.BufferAttribute(biomes, 4))
-    geometry.setAttribute(
-      'biomesWeights',
-      new THREE.BufferAttribute(biomesWeights, 4)
-    )
-
-    // console.log(geometry.attributes.biomes.getX(0));
-
-    const earthTexture = textureLoader.load(
-      baseUrl + 'assets/textures/EarthBaseColor1.png'
-    )
-    earthTexture.wrapS = earthTexture.wrapT = THREE.RepeatWrapping
-    earthTexture.encoding = THREE.sRGBEncoding
-    const earthNormal = textureLoader.load(
-      baseUrl + 'assets/textures/EarthNormal1.png'
-    )
-    earthNormal.wrapS = earthNormal.wrapT = THREE.RepeatWrapping
-
-    const grassTexture = textureLoader.load(
-      baseUrl + 'assets/textures/GrassBaseColor1.png'
-    )
-    grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping
-    const grassNormal = textureLoader.load(
-      baseUrl + 'assets/textures/GrassNormal1.png'
-    )
-    grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping
-
-    const material = new THREE.ShaderMaterial({
-      vertexShader: terrainVertex,
-      fragmentShader: terrainFragment,
-      // wireframe: true,
-      vertexColors: true,
-      side: THREE.FrontSide,
-      uniforms: {
-        uTime: { value: 0 },
-        uEarthBaseColor: {
-          value: earthTexture,
-        },
-        uGrassBaseColor: {
-          value: grassTexture,
-        },
-        uEarthNormal: {
-          value: earthNormal,
-        },
-        uGrassNormal: {
-          value: grassNormal,
-        },
-        // diffuseMap: {
-        //   value: {
-        //     textures: [
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/EarthBaseColor.png'
-        //       ),
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/GrassBaseColor.png'
-        //       ),
-        //     ],
-        //   },
-        // },
-        // normalMap: {
-        //   value: {
-        //     textures: [
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/EarthNormal.png'
-        //       ),
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/GrassNormal.png'
-        //       ),
-        //     ],
-        //   },
-        // },
-        noiseMap: {
-          value: textureLoader.load(
-            baseUrl + 'assets/textures/noiseMap.png'
-          ),
-        },
-        uResolution: {
-          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-        },
-        uTexture: { value: null },
-      },
-    })
-
-    const mesh = new THREE.Mesh(geometry, material)
-
-    // mesh.position.y = y
-
-    app.add(mesh)
-
-    const terrainPhysics = physics.addGeometry(mesh)
-    physicsIds.push(terrainPhysics)
-
-    clearChunkData(origin)
   }
 
   const chunkLocalPosition = new THREE.Vector3()
-
-  const chunkSize = 64;
-  const minC = -1;
-  const maxC = 1;
   const _forAllChunks = (fn) => {
     for (let cx = minC; cx <= maxC; cx++) {
       for (let cz = minC; cz <= maxC; cz++) {
@@ -179,8 +169,6 @@ export default (e) => {
     chunkLocalPosition.set(x, y, z).multiplyScalar(chunkSize);
     addChunk(chunkLocalPosition);
   });
-
-  // useFrame(({ timestamp }) => {})
 
   useCleanup(() => {
     for (const physicsId of physicsIds) {
