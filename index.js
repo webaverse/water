@@ -239,15 +239,22 @@ export default e => {
   app.add(generator.object);
   generator.object.updateMatrixWorld();
 
+  let lastHitTime = 0;
   hitManager.addEventListener('hitattempt', e => {
     const {type, args} = e.data;
     if (type === 'sword') {
-      const {
-        position,
-        quaternion,
-        // hitHalfHeight,
-      } = args;
-      generator.hit(position);
+      const now = performance.now();
+      const timeDiff = now - lastHitTime;
+      if (timeDiff > 1000) {
+        const {
+          position,
+          quaternion,
+          // hitHalfHeight,
+        } = args;
+        generator.hit(position);
+
+        lastHitTime = now;
+      }
     }
   });
 
