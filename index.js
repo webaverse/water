@@ -126,7 +126,7 @@ const makeTerrainChunk = (chunk, physics) => {
 
     const mesh = new THREE.Mesh(geometry, material);
 
-    // clearChunkData(origin, physics);
+    clearChunkData(origin, physics);
 
     return mesh;
   } else {
