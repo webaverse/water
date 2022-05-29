@@ -126,7 +126,8 @@ const makeTerrainChunk = (chunk, physics) => {
 
     const mesh = new THREE.Mesh(geometry, material);
 
-    clearChunkData(origin, physics);
+    console.log('clear chunk data', chunk.toArray().join(','), localVector.toArray().join(','));
+    clearChunkData(chunk, physics);
 
     return mesh;
   } else {
