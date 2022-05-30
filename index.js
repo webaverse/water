@@ -6,15 +6,14 @@ import metaversefile from 'metaversefile';
 import * as THREE from 'three';
 import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 
-const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useCamera, useHitManager, useLodder} = metaversefile;
+const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useCamera, useHitManager, useTerrainManager, useLodder} = metaversefile;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
 const localVector = new THREE.Vector3();
 
-const chunkWorldSize = 64;
-// const minC = -1;
-// const maxC = 1;
+const terrainManager = useTerrainManager();
+const chunkWorldSize = terrainManager.chunkSize;
 const numLods = 1;
 const textureLoader = new THREE.TextureLoader();
 
@@ -234,6 +233,7 @@ export default e => {
   const tracker = new LodChunkTracker(generator, {
     chunkWorldSize,
     numLods,
+    chunkHeight: chunkWorldSize,
   });
 
   app.add(generator.object);
