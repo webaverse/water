@@ -6,7 +6,7 @@ import metaversefile from 'metaversefile';
 import * as THREE from 'three';
 import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 
-const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useCamera, useHitManager, useTerrainManager, useLodder} = metaversefile;
+const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useHitManager, useTerrainManager, useLodder} = metaversefile;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
@@ -17,24 +17,11 @@ const chunkWorldSize = terrainManager.chunkSize;
 const numLods = 1;
 const textureLoader = new THREE.TextureLoader();
 
-const generateChunkMesh = (origin, physics) => {
-  physics.generateChunkDataDualContouring(origin.x, origin.y, origin.z);
-};
-const setChunkLod = (origin, lod, physics) => {
-  physics.setChunkLodDualContouring(origin.x, origin.y, origin.z, lod);
-};
-const clearChunkData = (origin, physics) => {
-  physics.clearTemporaryChunkDataDualContouring();
-  physics.clearChunkRootDualContouring(origin.x, origin.y, origin.z);
-};
-
-const makeTerrainChunk = (chunk, physics) => {
+const makeTerrainChunk = async (chunk) => {
   // console.log('make terrain chunk', chunk, physics);
 
-  localVector.copy(chunk).multiplyScalar(chunkWorldSize);
-  generateChunkMesh(localVector, physics);
-  setChunkLod(localVector, 1, physics);
-  const meshData = physics.createChunkMeshDualContouring(localVector.x, localVector.y, localVector.z);
+  const lod = 1;
+  const meshData = await terrainManager.generateChunk(chunk, lod);
   if (meshData) { // non-empty chunk
     const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
 
@@ -125,8 +112,8 @@ const makeTerrainChunk = (chunk, physics) => {
 
     const mesh = new THREE.Mesh(geometry, material);
 
-    console.log('clear chunk data', chunk.toArray().join(','), localVector.toArray().join(','));
-    clearChunkData(chunk, physics);
+    // console.log('clear chunk data', chunk.toArray().join(','), localVector.toArray().join(','));
+    // clearChunkData(chunk, physics);
 
     return mesh;
   } else {
@@ -148,21 +135,25 @@ class TerrainChunkGenerator {
     return this.object.children;
   }
   generateChunk(chunk) {
-    const mesh = makeTerrainChunk(chunk, this.physics);
-    if (mesh) {
-      this.object.add(mesh);
-      mesh.updateMatrixWorld();
-    
-      const physicsObject = this.physics.addGeometry(mesh);
+    // XXX support signal
+    (async () => {
+      // console.log('generate chunk', chunk.toArray().join(','));
+      const mesh = await makeTerrainChunk(chunk);
+      if (mesh) {
+        this.object.add(mesh);
+        mesh.updateMatrixWorld();
+      
+        const physicsObject = this.physics.addGeometry(mesh);
 
-      chunk.binding = {
-        mesh,
-        physicsObject,
-      };
-      mesh.chunk = chunk;
+        chunk.binding = {
+          mesh,
+          physicsObject,
+        };
+        mesh.chunk = chunk;
 
-      console.log('generate chunk', chunk.toArray().join(','), mesh, physicsObject);
-    }
+        console.log('generate chunk', chunk.toArray().join(','), mesh, physicsObject);
+      }
+    })();
   }
   disposeChunk(chunk) {
     const binding = chunk.binding;
@@ -190,24 +181,24 @@ class TerrainChunkGenerator {
       return this.getMeshAtWorldPosition(v);
     });
     const oldChunks = oldMeshes.filter(mesh => mesh !== null).map(mesh => mesh.chunk);
-    console.log('got needed', {
+    /* console.log('got needed', {
       neededChunkMins,
       oldMeshes,
       oldChunks,
       chunks: this.object.children.map(m => m.chunk),
-    });
+    }); */
     for (const oldChunk of oldChunks) {
       this.disposeChunk(oldChunk);
     }
 
-    setTimeout(() => {
-      for (const minVector of neededChunkMins) {
+    setTimeout(async () => {
+      await Promise.all(neededChunkMins.map(async minVector => {
         const chunkPosition = localVector.copy(minVector).divideScalar(chunkWorldSize).clone();
-        const chunk = this.generateChunk(chunkPosition);
+        const chunk = await this.generateChunk(chunkPosition);
         return chunk;
-      }
+      }));
       // console.log('got hit result', result, chunks, this.object.children.map(m => m.chunk.toArray().join(',')));
-    }, 3000);
+    }, 1000);
   }
   update(timestamp, timeDiff) {
     for (const mesh of this.getMeshes()) {
@@ -226,8 +217,6 @@ export default e => {
   const {LodChunkTracker} = useLodder();
 
   app.name = 'dual-contouring-terrain';
-
-  physics.setChunkSize(chunkWorldSize);
 
   const generator = new TerrainChunkGenerator(this, physics);
   const tracker = new LodChunkTracker(generator, {
