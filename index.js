@@ -18,8 +18,6 @@ const numLods = 1;
 const textureLoader = new THREE.TextureLoader();
 
 const makeTerrainChunk = async (chunk) => {
-  // console.log('make terrain chunk', chunk, physics);
-
   const lod = 1;
   const meshData = await terrainManager.generateChunk(chunk, lod);
   if (meshData) { // non-empty chunk
@@ -135,14 +133,21 @@ class TerrainChunkGenerator {
     return this.object.children;
   }
   generateChunk(chunk) {
-    // XXX support signal
+    // XXX support signal cancellation
     (async () => {
       // console.log('generate chunk', chunk.toArray().join(','));
       const mesh = await makeTerrainChunk(chunk);
       if (mesh) {
         this.object.add(mesh);
         mesh.updateMatrixWorld();
-      
+
+        // XXX 
+        (async () => {
+          // console.log('cook 1', mesh);
+          const result = await this.physics.cookGeometryAsync(mesh);
+          // console.log('cook 2', result);
+        })();
+
         const physicsObject = this.physics.addGeometry(mesh);
 
         chunk.binding = {
@@ -151,7 +156,7 @@ class TerrainChunkGenerator {
         };
         mesh.chunk = chunk;
 
-        console.log('generate chunk', chunk.toArray().join(','), mesh, physicsObject);
+        // console.log('generate chunk', chunk.toArray().join(','), mesh, physicsObject);
       }
     })();
   }
@@ -160,7 +165,7 @@ class TerrainChunkGenerator {
     if (binding) {
       const {mesh, physicsObject} = binding;
       this.object.remove(mesh);
-      console.log('dispose chunk', chunk.toArray().join(','), mesh, physicsObject);
+      // console.log('dispose chunk', chunk.toArray().join(','), mesh, physicsObject);
 
       this.physics.removeGeometry(physicsObject);
 
