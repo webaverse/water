@@ -129,6 +129,7 @@ class TerrainMesh extends THREE.Mesh {
 
     this.physics = physics;
     this.allocator = allocator;
+    this.physicsObjects = [];
   }
   async addChunk(chunk, {
     signal,
@@ -193,11 +194,13 @@ class TerrainMesh extends THREE.Mesh {
 
         mesh.matrixWorld.decompose(localVector, localQuaterion, localVector2);
         const physicsObject = this.physics.addCookedGeometry(geometryBuffer, localVector, localQuaterion, localVector2);
+        this.physicsObjects.push(physicsObject);
         
         // console.log('cook 3', mesh);
 
         signal.addEventListener('abort', e => {
           this.physics.removeGeometry(physicsObject);
+          this.physicsObjects.splice(this.physicsObjects.indexOf(physicsObject), 1);
         });
       };
       await _handlePhysics();
@@ -222,6 +225,10 @@ class TerrainChunkGenerator {
   }
   getMeshes() {
     return this.object.children;
+  }
+  getPhysicsObjects() {
+    // console.log('get physics object', this.terrainMesh.physicsObjects);
+    return this.terrainMesh.physicsObjects;
   }
   generateChunk(chunk) {
     // XXX support signal cancellation
@@ -294,7 +301,7 @@ class TerrainChunkGenerator {
 export default e => {
   const app = useApp();
   const physics = usePhysics();
-  const hitManager = useHitManager();
+  // const hitManager = useHitManager();
   const {LodChunkTracker} = useLodder();
 
   app.name = 'dual-contouring-terrain';
@@ -309,7 +316,14 @@ export default e => {
   app.add(generator.object);
   generator.object.updateMatrixWorld();
 
-  let lastHitTime = 0;
+  app.getPhysicsObjects = () => generator.getPhysicsObjects();
+
+  // console.log('got hit tracker', app.hitTracker);
+  app.addEventListener('hit', e => {
+    console.log('app got hit', e);
+  });
+
+  /* let lastHitTime = 0;
   hitManager.addEventListener('hitattempt', e => {
     const {type, args} = e.data;
     if (type === 'sword') {
@@ -326,7 +340,7 @@ export default e => {
         lastHitTime = now;
       }
     }
-  });
+  }); */
 
   useFrame(() => {
     const localPlayer = useLocalPlayer();
