@@ -11,6 +11,8 @@ const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useHitManager, 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
 const localVector = new THREE.Vector3();
+const localVector2 = new THREE.Vector3();
+const localQuaterion = new THREE.Quaternion();
 
 const terrainManager = useTerrainManager();
 const chunkWorldSize = terrainManager.chunkSize;
@@ -138,17 +140,19 @@ class TerrainChunkGenerator {
       // console.log('generate chunk', chunk.toArray().join(','));
       const mesh = await makeTerrainChunk(chunk);
       if (mesh) {
+        // console.log('cook 1', mesh);
+        const geometryBuffer = await this.physics.cookGeometryAsync(mesh);
+        // console.log('cook 2', mesh);
+
+        mesh.matrixWorld.decompose(localVector, localQuaterion, localVector2);
+        const physicsObject = this.physics.addCookedGeometry(geometryBuffer, localVector, localQuaterion, localVector2);
+        
+        // console.log('cook 3', mesh);
+
         this.object.add(mesh);
         mesh.updateMatrixWorld();
 
-        // XXX 
-        (async () => {
-          // console.log('cook 1', mesh);
-          const result = await this.physics.cookGeometryAsync(mesh);
-          // console.log('cook 2', result);
-        })();
-
-        const physicsObject = this.physics.addGeometry(mesh);
+        // console.log('cook 4', mesh);
 
         chunk.binding = {
           mesh,
