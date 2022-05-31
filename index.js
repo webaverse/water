@@ -19,9 +19,14 @@ const chunkWorldSize = terrainManager.chunkSize;
 const numLods = 1;
 const textureLoader = new THREE.TextureLoader();
 
-const makeTerrainChunk = async (chunk) => {
+const abortError = new Error('chunk disposed');
+
+const makeTerrainChunk = async (chunk, {
+  signal = null,
+} = {}) => {
   const lod = 1;
   const meshData = await terrainManager.generateChunk(chunk, lod);
+  signal && signal.throwIfAborted();
   if (meshData) { // non-empty chunk
     const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
 
@@ -136,12 +141,18 @@ class TerrainChunkGenerator {
   }
   generateChunk(chunk) {
     // XXX support signal cancellation
+    const abortController = new AbortController();
+    const {signal} = abortController;
     (async () => {
       // console.log('generate chunk', chunk.toArray().join(','));
-      const mesh = await makeTerrainChunk(chunk);
+      const mesh = await makeTerrainChunk(chunk, {
+        signal,
+      });
       if (mesh) {
         // console.log('cook 1', mesh);
-        const geometryBuffer = await this.physics.cookGeometryAsync(mesh);
+        const geometryBuffer = await this.physics.cookGeometryAsync(mesh, {
+          signal,
+        });
         // console.log('cook 2', mesh);
 
         mesh.matrixWorld.decompose(localVector, localQuaterion, localVector2);
@@ -154,27 +165,41 @@ class TerrainChunkGenerator {
 
         // console.log('cook 4', mesh);
 
-        chunk.binding = {
-          mesh,
-          physicsObject,
-        };
+        chunk.binding.mesh = mesh;
+        chunk.binding.physicsObject = physicsObject;
         mesh.chunk = chunk;
 
         // console.log('generate chunk', chunk.toArray().join(','), mesh, physicsObject);
       }
-    })();
+    })().catch(err => {
+      if (err !== abortError) {
+        console.warn(err);
+      }
+    });
+
+    chunk.binding = {
+      abortController,
+      signal,
+      mesh: null,
+      physicsObject: null,
+    }
   }
   disposeChunk(chunk) {
     const binding = chunk.binding;
     if (binding) {
+      const {abortController} = binding;
+      abortController.abort(abortError);
+
       const {mesh, physicsObject} = binding;
-      this.object.remove(mesh);
-      // console.log('dispose chunk', chunk.toArray().join(','), mesh, physicsObject);
+      if (mesh && physicsObject) {
+        this.object.remove(mesh);
+        // console.log('dispose chunk', chunk.toArray().join(','), mesh, physicsObject);
 
-      this.physics.removeGeometry(physicsObject);
+        this.physics.removeGeometry(physicsObject);
 
-      chunk.binding = null;
-      mesh.chunk = null;
+        chunk.binding = null;
+        mesh.chunk = null;
+      }
     } /* else {
       console.log('do not dispose chunk', chunk.toArray().join(','));
     } */
