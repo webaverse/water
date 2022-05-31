@@ -152,16 +152,16 @@ class TerrainMesh extends THREE.Mesh {
         let biomesWeightsOffset = geometryBinding.getAttributeOffset('biomesWeights');
         let indexOffset = geometryBinding.getIndexOffset();
 
-        geometry.attributes.position.array.set(meshData.positions, positionOffset);
-        geometry.attributes.normal.array.set(meshData.normals, normalOffset);
-        geometry.attributes.biomes.array.set(meshData.biomes, biomesOffset);
-        geometry.attributes.biomesWeights.array.set(meshData.biomesWeights, biomesWeightsOffset);
+        // geometry.attributes.position.array.set(meshData.positions, positionOffset);
+        // geometry.attributes.normal.array.set(meshData.normals, normalOffset);
+        // geometry.attributes.biomes.array.set(meshData.biomes, biomesOffset);
+        // geometry.attributes.biomesWeights.array.set(meshData.biomesWeights, biomesWeightsOffset);
         _mapOffsettedIndices(meshData.indices, geometry.index.array, indexOffset, positionOffset);
 
-        geometry.attributes.position.update(positionOffset, meshData.positions.length);
-        geometry.attributes.normal.update(normalOffset, meshData.normals.length);
-        geometry.attributes.biomes.update(biomesOffset, meshData.biomes.length);
-        geometry.attributes.biomesWeights.update(biomesWeightsOffset, meshData.biomesWeights.length);
+        geometry.attributes.position.update(positionOffset, meshData.positions.length, meshData.positions, 0);
+        geometry.attributes.normal.update(normalOffset, meshData.normals.length, meshData.normals, 0);
+        geometry.attributes.biomes.update(biomesOffset, meshData.biomes.length, meshData.biomes, 0);
+        geometry.attributes.biomesWeights.update(biomesWeightsOffset, meshData.biomesWeights.length, meshData.biomesWeights, 0);
         geometry.index.update(indexOffset, meshData.indices.length);
       };
       const _updateRenderList = () => {
