@@ -17,28 +17,43 @@ const localQuaterion = new THREE.Quaternion();
 const terrainManager = useTerrainManager();
 const chunkWorldSize = terrainManager.chunkSize;
 const numLods = 1;
+const bufferSize = 20 * 1024 * 1024;
+
 const textureLoader = new THREE.TextureLoader();
-
 const abortError = new Error('chunk disposed');
+const fakeMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+});
 
-const makeTerrainChunk = async (chunk, {
-  signal = null,
-} = {}) => {
-  const lod = 1;
-  const meshData = await terrainManager.generateChunk(chunk, lod);
-  signal && signal.throwIfAborted();
-  if (meshData) { // non-empty chunk
-    const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
-
-    const geometry = new THREE.BufferGeometry()
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals.slice(), 3))
-    geometry.setAttribute('biomes', new THREE.BufferAttribute(biomes.slice(), 4))
-    geometry.setAttribute('biomesWeights', new THREE.BufferAttribute(biomesWeights.slice(), 4))
-    geometry.setIndex(new THREE.BufferAttribute(indices.slice(), 1))
-
-    // XXX need to Module._free the bufferAddress
+class TerrainMesh extends THREE.Mesh {
+  constructor({
+    physics,
+  }) {
+    const allocator = new terrainManager.constructor.GeometryAllocator([
+      {
+        name: 'position',
+        Type: Float32Array,
+        itemSize: 3,
+      },
+      {
+        name: 'normal',
+        Type: Float32Array,
+        itemSize: 3,
+      },
+      {
+        name: 'biomes',
+        Type: Int32Array,
+        itemSize: 4,
+      },
+      {
+        name: 'biomesWeights',
+        Type: Float32Array,
+        itemSize: 2,
+      },
+    ], {
+      bufferSize,
+    });
+    const {geometry} = allocator;
 
     const earthTexture = textureLoader.load(
       baseUrl + 'assets/textures/EarthBaseColor1.png'
@@ -58,7 +73,6 @@ const makeTerrainChunk = async (chunk, {
       baseUrl + 'assets/textures/GrassNormal1.png'
     )
     grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping
-
     const material = new THREE.ShaderMaterial({
       vertexShader: terrainVertex,
       fragmentShader: terrainFragment,
@@ -113,18 +127,102 @@ const makeTerrainChunk = async (chunk, {
         },
         uTexture: { value: null },
       },
-    })
+    });
+    super(geometry, [material]); // array is needed for groups support
+    this.frustumCulled = false;
 
-    const mesh = new THREE.Mesh(geometry, material);
-
-    // console.log('clear chunk data', chunk.toArray().join(','), localVector.toArray().join(','));
-    // clearChunkData(chunk, physics);
-
-    return mesh;
-  } else {
-    return null;
+    this.physics = physics;
+    this.allocator = allocator;
   }
-};
+  async addChunk(chunk, {
+    signal,
+  }) {
+    const lod = 1;
+    const meshData = await terrainManager.generateChunk(chunk, lod);
+    signal.throwIfAborted();
+    if (meshData) { // non-empty chunk
+      // const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
+
+      const _mapOffsettedIndices = (srcIndices, dstIndices, dstOffset, positionOffset) => {
+        const positionIndex = positionOffset / 3;
+        for (let i = 0; i < srcIndices.length; i++) {
+          dstIndices[dstOffset + i] = srcIndices[i] + positionIndex;
+        }
+      };
+      const _renderMeshDataToGeometry = (meshData, geometry, geometryBinding) => {
+        let positionOffset = geometryBinding.getAttributeOffset('position');
+        let normalOffset = geometryBinding.getAttributeOffset('normal');
+        let biomesOffset = geometryBinding.getAttributeOffset('biomes');
+        let biomesWeightsOffset = geometryBinding.getAttributeOffset('biomesWeights');
+        let indexOffset = geometryBinding.getIndexOffset();
+
+        geometry.attributes.position.array.set(meshData.positions, positionOffset);
+        geometry.attributes.normal.array.set(meshData.normals, normalOffset);
+        geometry.attributes.biomes.array.set(meshData.biomes, biomesOffset);
+        geometry.attributes.biomesWeights.array.set(meshData.biomesWeights, biomesWeightsOffset);
+        _mapOffsettedIndices(meshData.indices, geometry.index.array, indexOffset, positionOffset);
+
+        geometry.attributes.position.update(positionOffset, meshData.positions.length);
+        geometry.attributes.normal.update(normalOffset, meshData.normals.length);
+        geometry.attributes.biomes.update(biomesOffset, meshData.biomes.length);
+        geometry.attributes.biomesWeights.update(biomesWeightsOffset, meshData.biomesWeights.length);
+        geometry.index.update(indexOffset, meshData.indices.length);
+      };
+      const _updateRenderList = () => {
+        this.allocator.geometry.groups = this.allocator.indexFreeList.getGeometryGroups(); // XXX memory for this can be optimized
+      };
+      const _handleMesh = () => {
+        const geometryBinding = this.allocator.alloc(meshData.positions.length, meshData.indices.length);
+        // const {
+        //   physicsObjects,
+        // } = _renderContentsRenderList(contentsLod0, contentNames, this.allocator.geometry, geometryBinding);
+        _renderMeshDataToGeometry(meshData, this.allocator.geometry, geometryBinding);
+        _updateRenderList();
+
+        signal.addEventListener('abort', e => {
+          this.allocator.free(geometryBinding);
+          _updateRenderList();
+        });
+      };
+      _handleMesh();
+
+      const _handlePhysics = async () => {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(meshData.positions, 3));
+        geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
+        const mesh = new THREE.Mesh(geometry, fakeMaterial);
+    
+        // console.log('cook 1', mesh);
+        const geometryBuffer = await this.physics.cookGeometryAsync(mesh, {
+          signal,
+        });
+        // console.log('cook 2', mesh);
+        if (signal.aborted) return;
+
+        mesh.matrixWorld.decompose(localVector, localQuaterion, localVector2);
+        const physicsObject = this.physics.addCookedGeometry(geometryBuffer, localVector, localQuaterion, localVector2);
+        
+        // console.log('cook 3', mesh);
+
+        signal.addEventListener('abort', e => {
+          this.physics.removeGeometry(physicsObject);
+        });
+      };
+      _handlePhysics();
+
+      // this.object.add(mesh);
+      // mesh.updateMatrixWorld();
+
+      // console.log('cook 4', mesh);
+
+      // binding
+      // mesh.chunk = chunk;
+
+      // console.log('clear chunk data', chunk.toArray().join(','), localVector.toArray().join(','));
+      // clearChunkData(chunk, physics);
+    }
+  }
+}
 
 class TerrainChunkGenerator {
   constructor(parent, physics) {
@@ -135,6 +233,11 @@ class TerrainChunkGenerator {
     // mesh
     this.object = new THREE.Group();
     this.object.name = 'terrain-chunk-generator';
+
+    this.terrainMesh = new TerrainMesh({
+      physics: this.physics,
+    });
+    this.object.add(this.terrainMesh);
   }
   getMeshes() {
     return this.object.children;
@@ -143,35 +246,10 @@ class TerrainChunkGenerator {
     // XXX support signal cancellation
     const abortController = new AbortController();
     const {signal} = abortController;
-    (async () => {
-      // console.log('generate chunk', chunk.toArray().join(','));
-      const mesh = await makeTerrainChunk(chunk, {
-        signal,
-      });
-      if (mesh) {
-        // console.log('cook 1', mesh);
-        const geometryBuffer = await this.physics.cookGeometryAsync(mesh, {
-          signal,
-        });
-        // console.log('cook 2', mesh);
 
-        mesh.matrixWorld.decompose(localVector, localQuaterion, localVector2);
-        const physicsObject = this.physics.addCookedGeometry(geometryBuffer, localVector, localQuaterion, localVector2);
-        
-        // console.log('cook 3', mesh);
-
-        this.object.add(mesh);
-        mesh.updateMatrixWorld();
-
-        // console.log('cook 4', mesh);
-
-        chunk.binding.mesh = mesh;
-        chunk.binding.physicsObject = physicsObject;
-        mesh.chunk = chunk;
-
-        // console.log('generate chunk', chunk.toArray().join(','), mesh, physicsObject);
-      }
-    })().catch(err => {
+    this.terrainMesh.addChunk(chunk, {
+      signal,
+    }).catch(err => {
       if (err !== abortError) {
         console.warn(err);
       }
@@ -179,9 +257,7 @@ class TerrainChunkGenerator {
 
     chunk.binding = {
       abortController,
-      signal,
-      mesh: null,
-      physicsObject: null,
+      // signal,
     }
   }
   disposeChunk(chunk) {
@@ -190,21 +266,11 @@ class TerrainChunkGenerator {
       const {abortController} = binding;
       abortController.abort(abortError);
 
-      const {mesh, physicsObject} = binding;
-      if (mesh && physicsObject) {
-        this.object.remove(mesh);
-        // console.log('dispose chunk', chunk.toArray().join(','), mesh, physicsObject);
-
-        this.physics.removeGeometry(physicsObject);
-
-        chunk.binding = null;
-        mesh.chunk = null;
-      }
-    } /* else {
-      console.log('do not dispose chunk', chunk.toArray().join(','));
-    } */
+      chunk.binding = null;
+    }
   }
   getMeshAtWorldPosition(p) {
+    return null; // XXX will be done with intersection
     localVector.copy(p).divideScalar(chunkWorldSize);
     const mesh = this.object.children.find(m => !!m.chunk && m.chunk.equals(localVector)) || null;
     return mesh;
