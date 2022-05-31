@@ -1,7 +1,3 @@
-/* eslint-disable arrow-parens */
-/* eslint-disable semi */
-/* eslint-disable object-curly-spacing */
-/* eslint-disable linebreak-style */
 import metaversefile from 'metaversefile';
 import * as THREE from 'three';
 import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
@@ -173,9 +169,6 @@ class TerrainMesh extends THREE.Mesh {
       };
       const _handleMesh = () => {
         const geometryBinding = this.allocator.alloc(meshData.positions.length, meshData.indices.length);
-        // const {
-        //   physicsObjects,
-        // } = _renderContentsRenderList(contentsLod0, contentNames, this.allocator.geometry, geometryBinding);
         _renderMeshDataToGeometry(meshData, this.allocator.geometry, geometryBinding);
         _updateRenderList();
 
@@ -197,7 +190,6 @@ class TerrainMesh extends THREE.Mesh {
           signal,
         });
         // console.log('cook 2', mesh);
-        if (signal.aborted) return;
 
         mesh.matrixWorld.decompose(localVector, localQuaterion, localVector2);
         const physicsObject = this.physics.addCookedGeometry(geometryBuffer, localVector, localQuaterion, localVector2);
@@ -208,18 +200,7 @@ class TerrainMesh extends THREE.Mesh {
           this.physics.removeGeometry(physicsObject);
         });
       };
-      _handlePhysics();
-
-      // this.object.add(mesh);
-      // mesh.updateMatrixWorld();
-
-      // console.log('cook 4', mesh);
-
-      // binding
-      // mesh.chunk = chunk;
-
-      // console.log('clear chunk data', chunk.toArray().join(','), localVector.toArray().join(','));
-      // clearChunkData(chunk, physics);
+      await _handlePhysics();
     }
   }
 }
