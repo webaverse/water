@@ -258,7 +258,7 @@ class TerrainChunkGenerator {
     }
   }
 
-  getMeshAtWorldPosition(p) {
+  /* getMeshAtWorldPosition(p) {
     return null; // XXX will be done with intersection
     localVector.copy(p).divideScalar(chunkWorldSize);
     const mesh =
@@ -266,20 +266,17 @@ class TerrainChunkGenerator {
         (m) => !!m.chunk && m.chunk.equals(localVector)
       ) || null;
     return mesh;
-  }
+  } */
 
-  hit(position) {
-    const neededChunkMins = this.physics.drawDamage(position, 3, 2);
-    const oldMeshes = neededChunkMins.map((v) => {
+  hit(e) {
+    const {hitPosition} = e;
+    console.log('hit 1', hitPosition.toArray().join(','));
+    const result = dcWorkerManager.eraseSphereDamage(hitPosition, 3);
+    console.log('hit 2', hitPosition.toArray().join(','), result);
+    /* const oldMeshes = neededChunkMins.map((v) => {
       return this.getMeshAtWorldPosition(v);
     });
     const oldChunks = oldMeshes.filter(mesh => mesh !== null).map(mesh => mesh.chunk);
-    /* console.log('got needed', {
-      neededChunkMins,
-      oldMeshes,
-      oldChunks,
-      chunks: this.object.children.map(m => m.chunk),
-    }); */
     for (const oldChunk of oldChunks) {
       this.disposeChunk(oldChunk);
     }
@@ -291,7 +288,7 @@ class TerrainChunkGenerator {
         return chunk;
       }));
       // console.log('got hit result', result, chunks, this.object.children.map(m => m.chunk.toArray().join(',')));
-    }, 1000);
+    }, 1000); */
   }
 
   update(timestamp, timeDiff) {
@@ -327,7 +324,7 @@ export default (e) => {
 
   // console.log('got hit tracker', app.hitTracker);
   app.addEventListener('hit', e => {
-    console.log('app got hit', e);
+    generator.hit(e);
   });
 
   /* let lastHitTime = 0;
