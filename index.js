@@ -2,7 +2,7 @@ import metaversefile from 'metaversefile';
 import * as THREE from 'three';
 import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 
-const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useHitManager, useTerrainManager, useLodder} = metaversefile;
+const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useHitManager, useDcWorkerManager, useLodder} = metaversefile;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
@@ -10,8 +10,8 @@ const localVector = new THREE.Vector3();
 const localVector2 = new THREE.Vector3();
 const localQuaterion = new THREE.Quaternion();
 
-const terrainManager = useTerrainManager();
-const chunkWorldSize = terrainManager.chunkSize;
+const dcWorkerManager = useDcWorkerManager();
+const chunkWorldSize = dcWorkerManager.chunkSize;
 const numLods = 1;
 const bufferSize = 20 * 1024 * 1024;
 
@@ -25,7 +25,7 @@ class TerrainMesh extends THREE.Mesh {
   constructor({
     physics,
   }) {
-    const allocator = new terrainManager.constructor.GeometryAllocator([
+    const allocator = new dcWorkerManager.constructor.GeometryAllocator([
       {
         name: 'position',
         Type: Float32Array,
@@ -133,7 +133,7 @@ class TerrainMesh extends THREE.Mesh {
     signal,
   }) {
     const lod = 1;
-    const meshData = await terrainManager.generateChunk(chunk, lod);
+    const meshData = await dcWorkerManager.generateChunk(chunk, lod);
     signal.throwIfAborted();
     if (meshData) { // non-empty chunk
       // const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
