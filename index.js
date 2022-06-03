@@ -397,7 +397,7 @@ class TerrainMesh extends THREE.Mesh {
       {
         name: 'biomesWeights',
         Type: Float32Array,
-        itemSize: 2,
+        itemSize: 4,
       },
     ], {
       bufferSize,
