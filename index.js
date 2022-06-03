@@ -422,14 +422,21 @@ class TerrainMesh extends THREE.Mesh {
       baseUrl + 'assets/textures/GrassNormal1.png'
     )
     grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping
-    const material = new THREE.ShaderMaterial({
-      vertexShader: terrainVertex,
-      fragmentShader: terrainFragment,
+    const material = new THREE.MeshStandardMaterial({
+      // vertexShader: terrainVertex,
+      // fragmentShader: terrainFragment,
       // wireframe: true,
-      vertexColors: true,
-      side: THREE.FrontSide,
+      // vertexColors: true,
+      // side: THREE.FrontSide,
+      map: biomeDataTexture,
       uniforms: {
-        uTime: { value: 0 },
+        /* map: {
+          value: biomeDataTexture,
+          needsUpdate: true,
+        }, */
+        uTime: {
+          value: 0,
+        },
         uEarthBaseColor: {
           value: earthTexture,
         },
@@ -474,6 +481,52 @@ class TerrainMesh extends THREE.Mesh {
         },
         uTexture: { value: null },
       },
+      transparent: true,
+      onBeforeCompile: (shader) => {
+        console.log('on before compile', shader);
+
+        shader.vertexShader = shader.vertexShader.replace(`#include <uv_pars_vertex>`, `\
+#ifdef USE_UV
+	#ifdef UVS_VERTEX_ONLY
+		vec2 vUv;
+	#else
+		varying vec2 vUv;
+    attribute ivec4 biomes;
+    attribute vec4 biomeWeights;
+		flat varying ivec4 vBiomes;
+		flat varying vec4 vBiomeWeights;
+	#endif
+	uniform mat3 uvTransform;
+#endif
+        `);
+        shader.vertexShader = shader.vertexShader.replace(`#include <uv_vertex>`, `\
+#ifdef USE_UV
+	vUv = ( uvTransform * vec3( uv, 1 ) ).xy;
+  vBiomes = biomes;
+  vBiomeWeights = biomeWeights;
+#endif
+        `);
+
+        shader.fragmentShader = shader.fragmentShader.replace(`#include <map_pars_fragment>`, `\
+#ifdef USE_MAP
+  uniform sampler2D map;
+  flat varying ivec4 vBiomes;
+	flat varying vec4 vBiomeWeights;
+#endif
+        `);
+        shader.fragmentShader = shader.fragmentShader.replace(`#include <map_fragment>`, `\
+#ifdef USE_MAP
+  vec2 uv = vec2((float(vBiomes.x) + 0.5) / 256.0, 0.5);
+  vec4 sampledDiffuseColor = texture2D( map, uv );
+  #ifdef DECODE_VIDEO_TEXTURE
+    // inline sRGB decode (TODO: Remove this code when https://crbug.com/1256340 is solved)
+    sampledDiffuseColor = vec4( mix( pow( sampledDiffuseColor.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), sampledDiffuseColor.rgb * 0.0773993808, vec3( lessThanEqual( sampledDiffuseColor.rgb, vec3( 0.04045 ) ) ) ), sampledDiffuseColor.w );
+  #endif
+  diffuseColor *= sampledDiffuseColor;
+#endif
+        `);
+        return shader;
+      },
     });
     super(geometry, [material]); // array is needed for groups support
     this.frustumCulled = false;
@@ -485,12 +538,10 @@ class TerrainMesh extends THREE.Mesh {
   async addChunk(chunk, {
     signal,
   }) {
-    const lod = 1;
+    const lod = 0;
     const meshData = await dcWorkerManager.generateChunk(chunk, lod);
     signal.throwIfAborted();
     if (meshData) { // non-empty chunk
-      // const {positions, normals, indices, biomes, biomesWeights, bufferAddress} = meshData;
-
       const _mapOffsettedIndices = (srcIndices, dstIndices, dstOffset, positionOffset) => {
         const positionIndex = positionOffset / 3;
         for (let i = 0; i < srcIndices.length; i++) {
@@ -504,10 +555,6 @@ class TerrainMesh extends THREE.Mesh {
         let biomesWeightsOffset = geometryBinding.getAttributeOffset('biomesWeights');
         let indexOffset = geometryBinding.getIndexOffset();
 
-        // geometry.attributes.position.array.set(meshData.positions, positionOffset);
-        // geometry.attributes.normal.array.set(meshData.normals, normalOffset);
-        // geometry.attributes.biomes.array.set(meshData.biomes, biomesOffset);
-        // geometry.attributes.biomesWeights.array.set(meshData.biomesWeights, biomesWeightsOffset);
         _mapOffsettedIndices(meshData.indices, geometry.index.array, indexOffset, positionOffset);
 
         geometry.attributes.position.update(positionOffset, meshData.positions.length, meshData.positions, 0);
