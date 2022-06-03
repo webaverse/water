@@ -8,7 +8,9 @@ const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
 const localVector = new THREE.Vector3();
 const localVector2 = new THREE.Vector3();
-const localQuaterion = new THREE.Quaternion();
+const localQuaternion = new THREE.Quaternion();
+const localMatrix = new THREE.Matrix4();
+const localMatrix2 = new THREE.Matrix4();
 
 const dcWorkerManager = useDcWorkerManager();
 const chunkWorldSize = dcWorkerManager.chunkSize;
@@ -182,16 +184,16 @@ class TerrainMesh extends THREE.Mesh {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(meshData.positions, 3));
         geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
-        const mesh = new THREE.Mesh(geometry, fakeMaterial);
+        const physycsMesh = new THREE.Mesh(geometry, fakeMaterial);
     
         // console.log('cook 1', mesh);
-        const geometryBuffer = await this.physics.cookGeometryAsync(mesh, {
+        const geometryBuffer = await this.physics.cookGeometryAsync(physycsMesh, {
           signal,
         });
         // console.log('cook 2', mesh);
 
-        mesh.matrixWorld.decompose(localVector, localQuaterion, localVector2);
-        const physicsObject = this.physics.addCookedGeometry(geometryBuffer, localVector, localQuaterion, localVector2);
+        this.matrixWorld.decompose(localVector, localQuaternion, localVector2);
+        const physicsObject = this.physics.addCookedGeometry(geometryBuffer, localVector, localQuaternion, localVector2);
         this.physicsObjects.push(physicsObject);
         
         // console.log('cook 3', mesh);
@@ -270,9 +272,9 @@ class TerrainChunkGenerator {
 
   hit(e) {
     const {hitPosition} = e;
-    console.log('hit 1', hitPosition.toArray().join(','));
+    // console.log('hit 1', hitPosition.toArray().join(','));
     const result = dcWorkerManager.eraseSphereDamage(hitPosition, 3);
-    console.log('hit 2', hitPosition.toArray().join(','), result);
+    // console.log('hit 2', hitPosition.toArray().join(','), result);
     /* const oldMeshes = neededChunkMins.map((v) => {
       return this.getMeshAtWorldPosition(v);
     });
@@ -348,7 +350,14 @@ export default (e) => {
 
   useFrame(() => {
     const localPlayer = useLocalPlayer();
-    tracker.update(localPlayer.position);
+    // localMatrix.compose(localPlayer.position, localPlayer.quaternion, localPlayer.scale)
+    localMatrix.copy(localPlayer.matrixWorld)
+      .premultiply(
+        localMatrix2.copy(app.matrixWorld).invert()
+      )
+      .decompose(localVector, localQuaternion, localVector2)
+    // console.log('got pos', localPlayer.position.toArray().join(','), localVector.toArray().join(','));
+    tracker.update(localVector);
   });
 
   useCleanup(() => {
