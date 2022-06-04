@@ -367,7 +367,7 @@ const mapNames = [
   'Ambient_Occlusion',
 ];
 const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
-const biomesKtx2TexturePrefix = `/images/land-textures/`;
+const biomesKtx2TexturePrefix = `https://webaverse.github.io/land-textures/`;
 const neededTexturePrefixes = (() => {
   const neededTexturePrefixesSet = new Set();
   for (const biomeSpec of biomeSpecs) {
