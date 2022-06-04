@@ -360,7 +360,7 @@ const biomeDataTexture = (() => {
   const data = new Uint8Array(256 * 4);
   for (let i = 0; i < biomeSpecs.length; i++) {
     const biomeSpec = biomeSpecs[i];
-    const [name, colorHex, texture] = biomeSpec;
+    const [name, colorHex, textureName] = biomeSpec;
     localColor.setHex(colorHex);
     data[i * 4] = localColor.r * 255;
     data[i * 4 + 1] = localColor.g * 255;
@@ -373,6 +373,116 @@ const biomeDataTexture = (() => {
   texture.needsUpdate = true;
   return texture;
 })();
+
+const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
+const biomesKtx2TexturePrefix = `https://webaverse.github.io/land-textures/`;
+const loadImage = u => new Promise((resolve, reject) => {
+  const img = new Image();
+  img.onload = () => {
+    resolve(img);
+  };
+  img.onerror = reject;
+  img.crossOrigin = 'Anonymous';
+  img.src = u;
+});
+function downloadFile(file, filename) {
+  const blobURL = URL.createObjectURL(file);
+  const tempLink = document.createElement('a');
+  tempLink.style.display = 'none';
+  tempLink.href = blobURL;
+  tempLink.setAttribute('download', filename);
+
+  document.body.appendChild(tempLink);
+  tempLink.click();
+  document.body.removeChild(tempLink);
+}
+const bakeBiomesAtlas = async ({
+  size = 8096,
+} = {}) => {
+  const textureTileSize = size / 8;
+  const halfTextureTileSize = textureTileSize / 2;
+
+  const neededTexturePrefixesSet = new Set();
+  for (const biomeSpec of biomeSpecs) {
+    const [name, colorHex, textureName] = biomeSpec;
+    neededTexturePrefixesSet.add(textureName.replace(/Base_Color/, ''));
+  }
+  const neededTexturePrefixes = Array.from(neededTexturePrefixesSet);
+  // console.log('got texture names', neededTextureNames);
+  const atlasTextures = [];
+
+  const mapNames = [
+    'Base_Color',
+    'Height',
+    'Normal',
+    'Roughness',
+    'Ambient_Occlusion',
+  ];
+  for (const mapName of mapNames) {
+    const neededTextureNames = neededTexturePrefixes.map(prefix => `${prefix}${mapName}`);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    document.body.appendChild(canvas);
+    canvas.style.cssText = `\
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      width: 1024px;
+      height: 1024px;
+    `;
+
+    let index = 0;
+    for (const textureName of neededTextureNames) {
+      const x = index % 8;
+      const y = Math.floor(index / 8);
+
+      const u = biomesPngTexturePrefix + textureName + '.png';
+      const img = await loadImage(u);
+      console.log('load u', u, img.width, img.height);
+
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          ctx.drawImage(
+            img,
+            x * textureTileSize + halfTextureTileSize * dx,
+            y * textureTileSize + halfTextureTileSize * dy,
+            halfTextureTileSize,
+            halfTextureTileSize
+          );
+        }
+      }
+      atlasTextures.push({
+        name: textureName,
+        uv: [
+          x * textureTileSize / size,
+          y * textureTileSize / size,
+          (x + 1) * textureTileSize / size,
+          (y + 1) * textureTileSize / size,
+        ],
+      });
+    
+      index++;
+    }
+
+    const canvasBlob = await new Promise((resolve, reject) => {
+      canvas.toBlob(resolve, 'image/png');
+    });
+    downloadFile(canvasBlob, `${mapName}.png`);
+  }
+
+  const atlasJson = {
+    textures: atlasTextures,
+  };
+  const atlasJsonString = JSON.stringify(atlasJson, null, 2);
+  const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
+  downloadFile(atlasJsonBlob, `megatexture-atlas.json`);
+};
+window.bakeBiomesAtlas = bakeBiomesAtlas;
 
 class TerrainMesh extends THREE.Mesh {
   constructor({
