@@ -367,7 +367,7 @@ const mapNames = [
   'Ambient_Occlusion',
 ];
 const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
-const biomesKtx2TexturePrefix = `https://webaverse.github.io/land-textures/`;
+const biomesKtx2TexturePrefix = `/images/land-textures/`;
 const neededTexturePrefixes = (() => {
   const neededTexturePrefixesSet = new Set();
   for (const biomeSpec of biomeSpecs) {
@@ -815,9 +815,9 @@ vec4 triplanarNormal(sampler2D inputTexture , float scale , float blendSharpness
   async addChunk(chunk, {
     signal,
   }) {
-    const lod = 0;
-    const meshData = await dcWorkerManager.generateChunk(chunk, lod);
-    console.log('mesh data', meshData);
+    const lodArray = [1, 1, 1, 1, 1, 1, 1, 1];
+    const meshData = await dcWorkerManager.generateChunk(chunk, lodArray);
+    // console.log('mesh data', meshData);
     signal.throwIfAborted();
     if (meshData) { // non-empty chunk
       const _mapOffsettedIndices = (srcIndices, dstIndices, dstOffset, positionOffset) => {
