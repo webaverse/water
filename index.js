@@ -368,8 +368,8 @@ const biomeDataTexture = (() => {
     data[i * 4 + 3] = 255;
   }
   const texture = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat);
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
   return texture;
 })();
@@ -491,33 +491,53 @@ class TerrainMesh extends THREE.Mesh {
 		vec2 vUv;
 	#else
 		varying vec2 vUv;
-    attribute ivec4 biomes;
-    attribute vec4 biomeWeights;
-		flat varying ivec4 vBiomes;
-		flat varying vec4 vBiomeWeights;
 	#endif
 	uniform mat3 uvTransform;
 #endif
+
+attribute ivec4 biomes;
+attribute vec4 biomesWeights;
+uniform sampler2D map;
+varying vec4 vSampleColor;
+vec4 sampleBiome(ivec4 biomes, vec4 biomesWeights) {
+  vec2 uv0 = vec2((float(biomes.x) + 0.5) / 256.0, 0.5);
+  vec4 sampledDiffuseColor0 = texture2D(map, uv0);
+
+  vec2 uv1 = vec2((float(biomes.y) + 0.5) / 256.0, 0.5);
+  vec4 sampledDiffuseColor1 = texture2D(map, uv1);
+
+  vec2 uv2 = vec2((float(biomes.z) + 0.5) / 256.0, 0.5);
+  vec4 sampledDiffuseColor2 = texture2D(map, uv2);
+
+  vec2 uv3 = vec2((float(biomes.w) + 0.5) / 256.0, 0.5);
+  vec4 sampledDiffuseColor3 = texture2D(map, uv3);
+
+  return vec4(
+    sampledDiffuseColor0.rgb * biomesWeights.x +
+    sampledDiffuseColor1.rgb * biomesWeights.y +
+    sampledDiffuseColor2.rgb * biomesWeights.z +
+    sampledDiffuseColor3.rgb * biomesWeights.w,
+    1.
+  );
+}
         `);
         shader.vertexShader = shader.vertexShader.replace(`#include <uv_vertex>`, `\
 #ifdef USE_UV
 	vUv = ( uvTransform * vec3( uv, 1 ) ).xy;
-  vBiomes = biomes;
-  vBiomeWeights = biomeWeights;
 #endif
+
+vSampleColor = sampleBiome(biomes, biomesWeights);
         `);
 
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_pars_fragment>`, `\
 #ifdef USE_MAP
   uniform sampler2D map;
-  flat varying ivec4 vBiomes;
-	flat varying vec4 vBiomeWeights;
+  varying vec4 vSampleColor;
 #endif
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_fragment>`, `\
 #ifdef USE_MAP
-  vec2 uv = vec2((float(vBiomes.x) + 0.5) / 256.0, 0.5);
-  vec4 sampledDiffuseColor = texture2D( map, uv );
+  vec4 sampledDiffuseColor = vSampleColor;
   #ifdef DECODE_VIDEO_TEXTURE
     // inline sRGB decode (TODO: Remove this code when https://crbug.com/1256340 is solved)
     sampledDiffuseColor = vec4( mix( pow( sampledDiffuseColor.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), sampledDiffuseColor.rgb * 0.0773993808, vec3( lessThanEqual( sampledDiffuseColor.rgb, vec3( 0.04045 ) ) ) ), sampledDiffuseColor.w );
@@ -540,6 +560,7 @@ class TerrainMesh extends THREE.Mesh {
   }) {
     const lod = 0;
     const meshData = await dcWorkerManager.generateChunk(chunk, lod);
+    // console.log('mesh data', meshData);
     signal.throwIfAborted();
     if (meshData) { // non-empty chunk
       const _mapOffsettedIndices = (srcIndices, dstIndices, dstOffset, positionOffset) => {
