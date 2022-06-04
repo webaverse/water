@@ -377,8 +377,8 @@ const neededTexturePrefixes = (() => {
   const neededTexturePrefixes = Array.from(neededTexturePrefixesSet);
   return neededTexturePrefixes;
 })();
-// window.neededTexturePrefixes = neededTexturePrefixes;
 const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length));
+// window.neededTexturePrefixes = neededTexturePrefixes;
 
 const loadImage = u => new Promise((resolve, reject) => {
   const img = new Image();
@@ -508,7 +508,7 @@ class TerrainMesh extends THREE.Mesh {
     });
     const {geometry} = allocator;
 
-    const earthTexture = textureLoader.load(
+    /* const earthTexture = textureLoader.load(
       baseUrl + 'assets/textures/EarthBaseColor1.png'
     );
     earthTexture.wrapS = earthTexture.wrapT = THREE.RepeatWrapping;
@@ -525,65 +525,13 @@ class TerrainMesh extends THREE.Mesh {
     const grassNormal = textureLoader.load(
       baseUrl + 'assets/textures/GrassNormal1.png'
     )
-    grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping
+    grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping */
     const material = new THREE.MeshStandardMaterial({
-      // vertexShader: terrainVertex,
-      // fragmentShader: terrainFragment,
-      // wireframe: true,
-      // vertexColors: true,
-      // side: THREE.FrontSide,
       map: biomeDataTexture,
-      /* uniforms: {
-        uTime: {
-          value: 0,
-        },
-        uEarthBaseColor: {
-          value: earthTexture,
-        },
-        uGrassBaseColor: {
-          value: grassTexture,
-        },
-        uEarthNormal: {
-          value: earthNormal,
-        },
-        uGrassNormal: {
-          value: grassNormal,
-        },
-        // diffuseMap: {
-        //   value: {
-        //     textures: [
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/EarthBaseColor.png'
-        //       ),
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/GrassBaseColor.png'
-        //       ),
-        //     ],
-        //   },
-        // },
-        // normalMap: {
-        //   value: {
-        //     textures: [
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/EarthNormal.png'
-        //       ),
-        //       new THREE.TextureLoader(
-        //         baseUrl + '/assets/texture/GrassNormal.png'
-        //       ),
-        //     ],
-        //   },
-        // },
-        noiseMap: {
-          value: textureLoader.load(baseUrl + 'assets/textures/noiseMap.png'),
-        },
-        uResolution: {
-          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-        },
-        uTexture: { value: null },
-      }, */
+      normalMap: new THREE.Texture(),
       transparent: true,
       onBeforeCompile: (shader) => {
-        // console.log('on before compile', shader);
+        console.log('on before compile', shader.fragmentShader);
 
         shader.uniforms.biomeUvDataTexture = {
           value: biomeUvDataTexture,
@@ -594,12 +542,9 @@ class TerrainMesh extends THREE.Mesh {
             value: atlasTextures[mapName],
             needsUpdate: true,
           };
-
         }
-        /* shader.uniforms.uColor = {
-          value: new THREE.Color(0xFF0000),
-          needsUpdate: true,
-        }; */
+        
+        //
 
         shader.vertexShader = shader.vertexShader.replace(`#include <uv_pars_vertex>`, `\
 #ifdef USE_UV
@@ -614,7 +559,6 @@ class TerrainMesh extends THREE.Mesh {
 attribute ivec4 biomes;
 attribute vec4 biomesWeights;
 uniform sampler2D map;
-// varying vec4 vSampleColor;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
 varying vec3 vWorldPosition;
@@ -657,26 +601,22 @@ vBiomes = biomes;
 vBiomesWeights = biomesWeights;
         `);
 
+        //
+
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_pars_fragment>`, `\
 #ifdef USE_MAP
   uniform sampler2D map;
 #endif
 
-uniform sampler2D uEarthBaseColor;
+// uniform sampler2D uEarthBaseColor;
 uniform sampler2D Base_Color;
+uniform sampler2D Normal;
 uniform sampler2D biomeUvDataTexture;
-// uniform vec3 uColor;
-// varying vec4 vSampleColor;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 
-vec2 mapUv(vec2 uv) {
-  uv = mod(uv, vec2(1.));
-  // uv /= ${texturesPerRow.toFixed(8)};
-  return uv;
-}
 vec4 fourTapSample(
   sampler2D atlas,
   vec2 tileUV,
@@ -706,67 +646,48 @@ vec4 fourTapSample(
 
   return color / totalWeight;
 }
-vec4 triplanarMap(vec3 position, vec3 normal) {
-  const float mapScale = 1.;
+vec4 triplanarMap(sampler2D Base_Color, vec3 position, vec3 normal) {
+  // Triplanar mapping
+  vec2 tx = position.yz;
+  vec2 ty = position.zx;
+  vec2 tz = position.xy;
+
+  vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
+  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
 
   vec3 bf = normalize(abs(normal));
   bf /= dot(bf, vec3(1.));
 
-  // Triplanar mapping
-  vec2 tx = position.yz * mapScale;
-  vec2 ty = position.zx * mapScale;
-  vec2 tz = position.xy * mapScale;
-
-  // tx = mapUv(tx);
-  // ty = mapUv(ty);
-  // tz = mapUv(tz);
-
-  // if (float(vBiomes.x) > 6.99 && float(vBiomes.x) < 7.01) {
-  //   return vec4(0., 0., 0., 1.);
-  // } else {
-    vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
-    const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
-
-    vec4 cx = fourTapSample(Base_Color, tx, tileOffset, tileSize) * bf.x;
-    vec4 cy = fourTapSample(Base_Color, ty, tileOffset, tileSize) * bf.y;
-    vec4 cz = fourTapSample(Base_Color, tz, tileOffset, tileSize) * bf.z;
-    
-    vec4 color = cx + cy + cz;
-    return color;
-  // }
-}
-vec4 triplanarTexture(sampler2D inputTexture , float scale , float blendSharpness, vec3 vPosition, vec3 vNormal){
-  vec2 uvX = vPosition.zy * scale;
-  vec2 uvY = vPosition.xz * scale;
-  vec2 uvZ = vPosition.xy * scale;
+  vec4 cx = fourTapSample(Base_Color, tx, tileOffset, tileSize) * bf.x;
+  vec4 cy = fourTapSample(Base_Color, ty, tileOffset, tileSize) * bf.y;
+  vec4 cz = fourTapSample(Base_Color, tz, tileOffset, tileSize) * bf.z;
   
-  vec4 colX = texture2D(inputTexture , uvX);
-  vec4 colY = texture2D(inputTexture , uvY);
-  vec4 colZ = texture2D(inputTexture , uvZ);
-
-  vec3 blendWeight = pow(abs(vNormal), vec3(blendSharpness));
-  blendWeight /= dot(blendWeight,vec3(1));
-
-  return colX * blendWeight.x + colY * blendWeight.y + colZ * blendWeight.z;
+  vec4 color = cx + cy + cz;
+  return color;
 }
-vec4 triplanarNormal(sampler2D inputTexture , float scale , float blendSharpness, vec3 vPosition, vec3 vNormal) {
+vec4 triplanarNormal(sampler2D Normal, vec3 position, vec3 normal) {
   // Tangent Reconstruction
   // Triplanar uvs
-  vec2 uvX = vPosition.zy * scale;
-  vec2 uvY = vPosition.xz * scale;
-  vec2 uvZ = vPosition.xy * scale;
+  vec2 uvX = position.zy;
+  vec2 uvY = position.xz;
+  vec2 uvZ = position.xy;
+
+  vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
+  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
   
-  vec4 colX = texture2D(inputTexture , uvX);
-  vec4 colY = texture2D(inputTexture , uvY);
-  vec4 colZ = texture2D(inputTexture , uvZ);
-  // Tangent space normal maps
-  vec3 tx = colX.xyz * vec3(2,2,2) - vec3(1,1,1);
-  vec3 ty = colY.xyz * vec3(2,2,2) - vec3(1,1,1);
-  vec3 tz = colZ.xyz * vec3(2,2,2) - vec3(1,1,1);
-  vec3 weights = abs(vNormal.xyz);
-  weights = weights / (weights.x + weights.y + weights.z);
-  // Get the sign (-1 or 1) of the surface normal
+  vec3 bf = normalize(abs(normal));
+  bf /= dot(bf, vec3(1.));
+
+  vec4 cx = fourTapSample(Normal, uvX, tileOffset, tileSize) * bf.x;
+  vec4 cy = fourTapSample(Normal, uvY, tileOffset, tileSize) * bf.y;
+  vec4 cz = fourTapSample(Normal, uvZ, tileOffset, tileSize) * bf.z;
+
+  vec4 color = cx + cy + cz;
+  return color;
+
+  /* // Get the sign (-1 or 1) of the surface normal
   vec3 axis = sign(vNormal);
+
   // Construct tangent to world matrices for each axis
   vec3 tangentX = normalize(cross(vNormal, vec3(0.0, axis.x, 0.0)));
   vec3 bitangentX = normalize(cross(tangentX, vNormal)) * axis.x;
@@ -780,18 +701,38 @@ vec4 triplanarNormal(sampler2D inputTexture , float scale , float blendSharpness
   // Apply tangent to world matrix and triblend
   // Using clamp() because the cross products may be NANs
   vec3 worldNormal = normalize(
-      clamp(tbnX * tx, -1.0, 1.0) * weights.x +
-      clamp(tbnY * ty, -1.0, 1.0) * weights.y +
-      clamp(tbnZ * tz, -1.0, 1.0) * weights.z
-      );
-  return vec4(worldNormal, 0.0);
+      clamp(tbnX * tx, -1.0, 1.0) * bf.x +
+      clamp(tbnY * ty, -1.0, 1.0) * bf.y +
+      clamp(tbnZ * tz, -1.0, 1.0) * bf.z
+  );
+  return vec4(worldNormal, 0.0); */
 }
+        `);
+        shader.fragmentShader = shader.fragmentShader.replace(`#include <normal_fragment_maps>`, `\
+#ifdef OBJECTSPACE_NORMALMAP
+	normal = triplanarNormal(Normal, vWorldPosition, vWorldNormal).xyz /*texture2D( normalMap, vUv ).xyz*/ * 2.0 - 1.0; // overrides both flatShading and attribute normals
+	#ifdef FLIP_SIDED
+		normal = - normal;
+	#endif
+	#ifdef DOUBLE_SIDED
+		normal = normal * faceDirection;
+	#endif
+	normal = normalize( normalMatrix * normal );
+#elif defined( TANGENTSPACE_NORMALMAP )
+	vec3 mapN = triplanarNormal(Normal, vWorldPosition, vWorldNormal).xyz /*texture2D( normalMap, vUv ).xyz*/ * 2.0 - 1.0;
+	mapN.xy *= normalScale;
+	#ifdef USE_TANGENT
+		normal = normalize( vTBN * mapN );
+	#else
+		normal = perturbNormal2Arb( - vViewPosition, normal, mapN, faceDirection );
+	#endif
+#elif defined( USE_BUMPMAP )
+	normal = perturbNormalArb( - vViewPosition, normal, dHdxy_fwd(), faceDirection );
+#endif
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_fragment>`, `\
 #ifdef USE_MAP
-  vec4 sampledDiffuseColor = vec4(0.); // vSampleColor;
-  // sampledDiffuseColor *= triplanarTexture(uEarthBaseColor, 1., 1., vWorldPosition, vWorldNormal);
-  sampledDiffuseColor = sampledDiffuseColor * 0.5 + 0.5 * triplanarMap(vWorldPosition, vWorldNormal);
+  vec4 sampledDiffuseColor = triplanarMap(Base_Color, vWorldPosition, vWorldNormal);
   sampledDiffuseColor.a = 1.;
   #ifdef DECODE_VIDEO_TEXTURE
     // inline sRGB decode (TODO: Remove this code when https://crbug.com/1256340 is solved)
