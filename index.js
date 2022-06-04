@@ -365,6 +365,16 @@ const mapNames = [
 ];
 const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
 const biomesKtx2TexturePrefix = `https://webaverse.github.io/land-textures/`;
+const neededTexturePrefixes = (() => {
+  const neededTexturePrefixesSet = new Set();
+  for (const biomeSpec of biomeSpecs) {
+    const [name, colorHex, textureName] = biomeSpec;
+    neededTexturePrefixesSet.add(textureName.replace(/Base_Color/, ''));
+  }
+  const neededTexturePrefixes = Array.from(neededTexturePrefixesSet);
+  return neededTexturePrefixes;
+})();
+const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length));
 
 const loadImage = u => new Promise((resolve, reject) => {
   const img = new Image();
@@ -389,15 +399,7 @@ function downloadFile(file, filename) {
 const bakeBiomesAtlas = async ({
   size = 8 * 1024,
 } = {}) => {
-  const neededTexturePrefixesSet = new Set();
-  for (const biomeSpec of biomeSpecs) {
-    const [name, colorHex, textureName] = biomeSpec;
-    neededTexturePrefixesSet.add(textureName.replace(/Base_Color/, ''));
-  }
-  const neededTexturePrefixes = Array.from(neededTexturePrefixesSet);
-  // console.log('got texture names', neededTexturePrefixes);
   const atlasTextures = [];
-  const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length));
   const textureTileSize = size / texturesPerRow;
   const halfTextureTileSize = textureTileSize / 2;
 
@@ -586,6 +588,17 @@ class TerrainMesh extends THREE.Mesh {
           value: earthTexture,
           needsUpdate: true,
         };
+        for (const mapName of mapNames) {
+          shader.uniforms[mapName] = {
+            value: atlasTextures[mapName],
+            needsUpdate: true,
+          };
+
+        }
+        /* shader.uniforms.uColor = {
+          value: new THREE.Color(0xFF0000),
+          needsUpdate: true,
+        }; */
 
         shader.vertexShader = shader.vertexShader.replace(`#include <uv_pars_vertex>`, `\
 #ifdef USE_UV
@@ -642,12 +655,49 @@ vSampleColor = sampleBiome(biomes, biomesWeights);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_pars_fragment>`, `\
 #ifdef USE_MAP
   uniform sampler2D map;
-  uniform sampler2D uEarthBaseColor;
 #endif
 
+uniform sampler2D uEarthBaseColor;
+uniform sampler2D Base_Color;
+// uniform vec3 uColor;
 varying vec4 vSampleColor;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
+
+vec2 mapUv(vec2 uv) {
+  uv = mod(uv, vec2(1.));
+  // uv /= ${texturesPerRow.toFixed(8)};
+  return uv;
+}
+vec4 fourTapSample(
+  sampler2D atlas,
+  vec2 tileUV,
+  vec2 tileOffset,
+  vec2 tileSize
+) {
+  //Initialize accumulators
+  vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
+  float totalWeight = 0.0;
+
+  for (int dx=0; dx<2; ++dx) {
+    for (int dy=0; dy<2; ++dy) {
+      //Compute coordinate in 2x2 tile patch
+      vec2 tileCoord = 2.0 * fract(0.5 * (tileUV + vec2(dx,dy)));
+
+      //Weight sample based on distance to center
+      float w = pow(1.0 - max(abs(tileCoord.x-1.0), abs(tileCoord.y-1.0)), 16.0);
+
+      //Compute atlas coord
+      vec2 atlasUV = tileOffset + tileSize * tileCoord;
+
+      //Sample and accumulate
+      color += w * texture2D(atlas, atlasUV);
+      totalWeight += w;
+    }
+  }
+
+  return color / totalWeight;
+}
 vec4 triplanarMap(vec3 position, vec3 normal) {
   const float mapScale = 1.;
 
@@ -659,9 +709,23 @@ vec4 triplanarMap(vec3 position, vec3 normal) {
   vec2 ty = position.zx * mapScale;
   vec2 tz = position.xy * mapScale;
 
-  vec4 cx = texture2D(uEarthBaseColor, tx) * bf.x;
-  vec4 cy = texture2D(uEarthBaseColor, ty) * bf.y;
-  vec4 cz = texture2D(uEarthBaseColor, tz) * bf.z;
+  // tx = mapUv(tx);
+  // ty = mapUv(ty);
+  // tz = mapUv(tz);
+
+  const vec2 tileOffset = vec2(0.);
+  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
+
+  // vec4 o = vec4(tx.x, 0., tx.y, 1.);
+  // return o;
+  vec4 cx = fourTapSample(Base_Color, tx, tileOffset, tileSize) * bf.x;
+  vec4 cy = fourTapSample(Base_Color, ty, tileOffset, tileSize) * bf.y;
+  vec4 cz = fourTapSample(Base_Color, tz, tileOffset, tileSize) * bf.z;
+  
+  // vec4 cx = texture2D(Base_Color, tx / tileSize) * bf.x;
+  // return cx;
+  // vec4 cy = texture2D(Base_Color, ty) * bf.y;
+  // vec4 cz = texture2D(Base_Color, tz) * bf.z;
 
   vec4 color = cx + cy + cz;
   return color;
@@ -720,9 +784,10 @@ vec4 triplanarNormal(sampler2D inputTexture , float scale , float blendSharpness
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_fragment>`, `\
 #ifdef USE_MAP
-  vec4 sampledDiffuseColor = vSampleColor;
+  vec4 sampledDiffuseColor = vec4(0.); // vSampleColor;
   // sampledDiffuseColor *= triplanarTexture(uEarthBaseColor, 1., 1., vWorldPosition, vWorldNormal);
   sampledDiffuseColor = sampledDiffuseColor * 0.5 + 0.5 * triplanarMap(vWorldPosition, vWorldNormal);
+  sampledDiffuseColor.a = 1.;
   #ifdef DECODE_VIDEO_TEXTURE
     // inline sRGB decode (TODO: Remove this code when https://crbug.com/1256340 is solved)
     sampledDiffuseColor = vec4( mix( pow( sampledDiffuseColor.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), sampledDiffuseColor.rgb * 0.0773993808, vec3( lessThanEqual( sampledDiffuseColor.rgb, vec3( 0.04045 ) ) ) ), sampledDiffuseColor.w );
@@ -824,7 +889,7 @@ class TerrainChunkGenerator {
     this.parent = parent;
     this.physics = physics;
     this.biomeDataTexture = biomeDataTexture;
-    this.atlasTextures = this.atlasTextures;
+    this.atlasTextures = atlasTextures;
 
     // mesh
     this.object = new THREE.Group();
@@ -948,11 +1013,21 @@ export default (e) => {
     })();
 
     const {ktx2Loader} = useLoaders();
-    const atlasTextures = await Promise.all(mapNames.map(mapName => new Promise((accept, reject) => {
+    const atlasTexturesArray = await Promise.all(mapNames.map(mapName => new Promise((accept, reject) => {
       ktx2Loader.load(`${biomesKtx2TexturePrefix}build/8k/${mapName}.ktx2`, accept, function onprogress(e) {}, reject);
     })));
-    // console.log('got atlas textures', atlasTextures);
+    window.atlasTexturesArray = atlasTexturesArray;
     if (!live) return;
+    
+    const atlasTextures = {};
+    for (let i = 0; i < mapNames.length; i++) {
+      // atlasTexturesArray[i].needsUpdate = true;
+      // atlasTexturesArray[i].wrapS = THREE.RepeatWrapping;
+      // atlasTexturesArray[i].wrapT = THREE.RepeatWrapping;
+      const compressedTexture = atlasTexturesArray[i];
+      // compressedTexture.encoding = THREE.sRGBEncoding;
+      atlasTextures[mapNames[i]] = compressedTexture;
+    }
 
     generator = new TerrainChunkGenerator(this, {
       physics,
