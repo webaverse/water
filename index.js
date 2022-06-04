@@ -1,6 +1,6 @@
 import metaversefile from 'metaversefile';
 import * as THREE from 'three';
-import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
+// import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 
 const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useHitManager, useDcWorkerManager, useLodder} = metaversefile;
 
@@ -397,19 +397,19 @@ function downloadFile(file, filename) {
   document.body.removeChild(tempLink);
 }
 const bakeBiomesAtlas = async ({
-  size = 8096,
+  size = 8 * 1024,
 } = {}) => {
-  const textureTileSize = size / 8;
-  const halfTextureTileSize = textureTileSize / 2;
-
   const neededTexturePrefixesSet = new Set();
   for (const biomeSpec of biomeSpecs) {
     const [name, colorHex, textureName] = biomeSpec;
     neededTexturePrefixesSet.add(textureName.replace(/Base_Color/, ''));
   }
   const neededTexturePrefixes = Array.from(neededTexturePrefixesSet);
-  // console.log('got texture names', neededTextureNames);
+  // console.log('got texture names', neededTexturePrefixes);
   const atlasTextures = [];
+  const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length));
+  const textureTileSize = size / texturesPerRow;
+  const halfTextureTileSize = textureTileSize / 2;
 
   const mapNames = [
     'Base_Color',
@@ -473,6 +473,8 @@ const bakeBiomesAtlas = async ({
       canvas.toBlob(resolve, 'image/png');
     });
     downloadFile(canvasBlob, `${mapName}.png`);
+
+    document.body.removeChild(canvas);
   }
 
   const atlasJson = {
@@ -642,8 +644,27 @@ vSampleColor = sampleBiome(biomes, biomesWeights);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_pars_fragment>`, `\
 #ifdef USE_MAP
   uniform sampler2D map;
-  varying vec4 vSampleColor;
 #endif
+
+varying vec4 vSampleColor;
+vec4 triplanarMap(vec3 position, vec3 normal) {
+  const float mapScale = 1.;
+
+  vec3 bf = normalize(abs(normal));
+  bf /= dot(bf, vec3(1.));
+
+  // Triplanar mapping
+  vec2 tx = position.yz * mapScale;
+  vec2 ty = position.zx * mapScale;
+  vec2 tz = position.xy * mapScale;
+
+  vec4 cx = texture2D(map, tx) * bf.x;
+  vec4 cy = texture2D(map, ty) * bf.y;
+  vec4 cz = texture2D(map, tz) * bf.z;
+
+  vec4 color = cx + cy + cz;
+  return color;
+}
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_fragment>`, `\
 #ifdef USE_MAP
