@@ -1061,6 +1061,7 @@ export default (e) => {
       // atlasTexturesArray[i].wrapT = THREE.RepeatWrapping;
       const compressedTexture = atlasTexturesArray[i];
       // compressedTexture.encoding = THREE.sRGBEncoding;
+      compressedTexture.anisotropy = 16;
       atlasTextures[mapNames[i]] = compressedTexture;
     }
 
