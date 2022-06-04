@@ -367,7 +367,7 @@ const mapNames = [
   'Ambient_Occlusion',
 ];
 const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
-const biomesKtx2TexturePrefix = `https://webaverse.github.io/land-textures/`;
+const biomesKtx2TexturePrefix = `/images/land-textures/`;
 const neededTexturePrefixes = (() => {
   const neededTexturePrefixesSet = new Set();
   for (const biomeSpec of biomeSpecs) {
@@ -531,9 +531,10 @@ class TerrainMesh extends THREE.Mesh {
       normalMap: new THREE.Texture(),
       // normalScale: new THREE.Vector2(50, 50),
       // normalMapType: THREE.ObjectSpaceNormalMap,
-      // bumpMap: new THREE.Texture(),
+      bumpMap: new THREE.Texture(),
       // bumpScale: 1,
       roughnessMap: new THREE.Texture(),
+      aoMap: new THREE.Texture(),
       transparent: true,
       onBeforeCompile: (shader) => {
         console.log('on before compile', shader.fragmentShader);
@@ -594,6 +595,7 @@ vBiomesWeights = biomesWeights;
 uniform sampler2D Base_Color;
 uniform sampler2D Normal;
 uniform sampler2D Roughness;
+uniform sampler2D Ambient_Occlusion;
 uniform sampler2D Height;
 uniform sampler2D biomeUvDataTexture;
 flat varying ivec4 vBiomes;
@@ -818,6 +820,17 @@ float roughnessFactor = roughness;
     sampledDiffuseColor = vec4( mix( pow( sampledDiffuseColor.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), sampledDiffuseColor.rgb * 0.0773993808, vec3( lessThanEqual( sampledDiffuseColor.rgb, vec3( 0.04045 ) ) ) ), sampledDiffuseColor.w );
   #endif
   diffuseColor *= sampledDiffuseColor;
+#endif
+        `);
+        shader.fragmentShader = shader.fragmentShader.replace(`#include <aomap_fragment>`, `\
+#ifdef USE_AOMAP
+  // reads channel R, compatible with a combined OcclusionRoughnessMetallic (RGB) texture
+  float ambientOcclusion = ( triplanarMap( Ambient_Occlusion, vWorldPosition, vWorldNormal ).r /* * - 1.0 */ ) * aoMapIntensity /* + 1.0 */;
+  reflectedLight.indirectDiffuse *= ambientOcclusion;
+  #if defined( USE_ENVMAP ) && defined( STANDARD )
+    float dotNV = saturate( dot( geometry.normal, geometry.viewDir ) );
+    reflectedLight.indirectSpecular *= computeSpecularOcclusion( dotNV, ambientOcclusion, material.roughness );
+  #endif
 #endif
         `);
         return shader;
@@ -1080,7 +1093,7 @@ export default (e) => {
       // atlasTexturesArray[i].wrapS = THREE.RepeatWrapping;
       // atlasTexturesArray[i].wrapT = THREE.RepeatWrapping;
       const compressedTexture = atlasTexturesArray[i];
-      // compressedTexture.encoding = THREE.sRGBEncoding;
+      // compressedTexture.encoding = THREE.LinearEncoding;
       compressedTexture.anisotropy = 16;
       atlasTextures[mapNames[i]] = compressedTexture;
     }
