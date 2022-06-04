@@ -356,6 +356,9 @@ const biomeSpecs = [
     "Vol_24_2_Snow_Ice_Base_Color"
   ]
 ];
+for (const biome of biomeSpecs) {
+  biome[2] = biome[2].replace(/Base_Color/, '');
+}
 const mapNames = [
   'Base_Color',
   'Height',
@@ -369,11 +372,12 @@ const neededTexturePrefixes = (() => {
   const neededTexturePrefixesSet = new Set();
   for (const biomeSpec of biomeSpecs) {
     const [name, colorHex, textureName] = biomeSpec;
-    neededTexturePrefixesSet.add(textureName.replace(/Base_Color/, ''));
+    neededTexturePrefixesSet.add(textureName);
   }
   const neededTexturePrefixes = Array.from(neededTexturePrefixesSet);
   return neededTexturePrefixes;
 })();
+// window.neededTexturePrefixes = neededTexturePrefixes;
 const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length));
 
 const loadImage = u => new Promise((resolve, reject) => {
@@ -423,12 +427,12 @@ const bakeBiomesAtlas = async ({
 
     let index = 0;
     for (const textureName of neededTextureNames) {
-      const x = index % 8;
-      const y = Math.floor(index / 8);
+      const x = index % texturesPerRow;
+      const y = Math.floor(index / texturesPerRow);
 
       const u = biomesPngTexturePrefix + textureName + '.png';
       const img = await loadImage(u);
-      console.log('load u', u, img.width, img.height);
+      console.log('load u', u, textureName, img.width, img.height);
 
       for (let dy = 0; dy < 2; dy++) {
         for (let dx = 0; dx < 2; dx++) {
@@ -469,12 +473,13 @@ const bakeBiomesAtlas = async ({
   const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
   downloadFile(atlasJsonBlob, `megatexture-atlas.json`);
 };
-// window.bakeBiomesAtlas = bakeBiomesAtlas;
+window.bakeBiomesAtlas = bakeBiomesAtlas;
 
 class TerrainMesh extends THREE.Mesh {
   constructor({
     physics,
     biomeDataTexture,
+    biomeUvDataTexture,
     atlasTextures,
   }) {
     const allocator = new dcWorkerManager.constructor.GeometryAllocator([
@@ -528,11 +533,7 @@ class TerrainMesh extends THREE.Mesh {
       // vertexColors: true,
       // side: THREE.FrontSide,
       map: biomeDataTexture,
-      uniforms: {
-        /* map: {
-          value: biomeDataTexture,
-          needsUpdate: true,
-        }, */
+      /* uniforms: {
         uTime: {
           value: 0,
         },
@@ -579,13 +580,13 @@ class TerrainMesh extends THREE.Mesh {
           value: new THREE.Vector2(window.innerWidth, window.innerHeight),
         },
         uTexture: { value: null },
-      },
+      }, */
       transparent: true,
       onBeforeCompile: (shader) => {
-        console.log('on before compile', shader);
+        // console.log('on before compile', shader);
 
-        shader.uniforms.uEarthBaseColor = {
-          value: earthTexture,
+        shader.uniforms.biomeUvDataTexture = {
+          value: biomeUvDataTexture,
           needsUpdate: true,
         };
         for (const mapName of mapNames) {
@@ -613,7 +614,9 @@ class TerrainMesh extends THREE.Mesh {
 attribute ivec4 biomes;
 attribute vec4 biomesWeights;
 uniform sampler2D map;
-varying vec4 vSampleColor;
+// varying vec4 vSampleColor;
+flat varying ivec4 vBiomes;
+varying vec4 vBiomesWeights;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 vec4 sampleBiome(ivec4 biomes, vec4 biomesWeights) {
@@ -649,7 +652,9 @@ vec4 sampleBiome(ivec4 biomes, vec4 biomesWeights) {
 
 vWorldPosition = worldPosition.xyz;
 vWorldNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
-vSampleColor = sampleBiome(biomes, biomesWeights);
+// vSampleColor = sampleBiome(biomes, biomesWeights);
+vBiomes = biomes;
+vBiomesWeights = biomesWeights;
         `);
 
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_pars_fragment>`, `\
@@ -659,8 +664,11 @@ vSampleColor = sampleBiome(biomes, biomesWeights);
 
 uniform sampler2D uEarthBaseColor;
 uniform sampler2D Base_Color;
+uniform sampler2D biomeUvDataTexture;
 // uniform vec3 uColor;
-varying vec4 vSampleColor;
+// varying vec4 vSampleColor;
+flat varying ivec4 vBiomes;
+varying vec4 vBiomesWeights;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 
@@ -713,22 +721,19 @@ vec4 triplanarMap(vec3 position, vec3 normal) {
   // ty = mapUv(ty);
   // tz = mapUv(tz);
 
-  const vec2 tileOffset = vec2(0.);
-  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
+  // if (float(vBiomes.x) > 6.99 && float(vBiomes.x) < 7.01) {
+  //   return vec4(0., 0., 0., 1.);
+  // } else {
+    vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
+    const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
 
-  // vec4 o = vec4(tx.x, 0., tx.y, 1.);
-  // return o;
-  vec4 cx = fourTapSample(Base_Color, tx, tileOffset, tileSize) * bf.x;
-  vec4 cy = fourTapSample(Base_Color, ty, tileOffset, tileSize) * bf.y;
-  vec4 cz = fourTapSample(Base_Color, tz, tileOffset, tileSize) * bf.z;
-  
-  // vec4 cx = texture2D(Base_Color, tx / tileSize) * bf.x;
-  // return cx;
-  // vec4 cy = texture2D(Base_Color, ty) * bf.y;
-  // vec4 cz = texture2D(Base_Color, tz) * bf.z;
-
-  vec4 color = cx + cy + cz;
-  return color;
+    vec4 cx = fourTapSample(Base_Color, tx, tileOffset, tileSize) * bf.x;
+    vec4 cy = fourTapSample(Base_Color, ty, tileOffset, tileSize) * bf.y;
+    vec4 cz = fourTapSample(Base_Color, tz, tileOffset, tileSize) * bf.z;
+    
+    vec4 color = cx + cy + cz;
+    return color;
+  // }
 }
 vec4 triplanarTexture(sampler2D inputTexture , float scale , float blendSharpness, vec3 vPosition, vec3 vNormal){
   vec2 uvX = vPosition.zy * scale;
@@ -812,7 +817,7 @@ vec4 triplanarNormal(sampler2D inputTexture , float scale , float blendSharpness
   }) {
     const lod = 0;
     const meshData = await dcWorkerManager.generateChunk(chunk, lod);
-    // console.log('mesh data', meshData);
+    console.log('mesh data', meshData);
     signal.throwIfAborted();
     if (meshData) { // non-empty chunk
       const _mapOffsettedIndices = (srcIndices, dstIndices, dstOffset, positionOffset) => {
@@ -883,12 +888,14 @@ class TerrainChunkGenerator {
   constructor(parent, {
     physics,
     biomeDataTexture,
+    biomeUvDataTexture,
     atlasTextures,
   } = {}) {
     // parameters
     this.parent = parent;
     this.physics = physics;
     this.biomeDataTexture = biomeDataTexture;
+    this.biomeUvDataTexture = biomeUvDataTexture;
     this.atlasTextures = atlasTextures;
 
     // mesh
@@ -898,6 +905,7 @@ class TerrainChunkGenerator {
     this.terrainMesh = new TerrainMesh({
       physics: this.physics,
       biomeDataTexture: this.biomeDataTexture,
+      biomeUvDataTexture: this.biomeUvDataTexture,
       atlasTextures: this.atlasTextures,
     });
     this.object.add(this.terrainMesh);
@@ -1006,11 +1014,38 @@ export default (e) => {
         data[i * 4 + 3] = 255;
       }
       const texture = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.magFilter = THREE.NearestFilter;
       texture.needsUpdate = true;
       return texture;
     })();
+    const biomeUvDataTexture = (() => {
+      const data = new Uint8Array(256 * 4);
+      for (let i = 0; i < biomeSpecs.length; i++) {
+        const biomeSpec = biomeSpecs[i];
+        const [name, colorHex, textureName] = biomeSpec;
+        
+        const biomeAtlasIndex = neededTexturePrefixes.indexOf(textureName);
+        if (biomeAtlasIndex === -1) {
+          throw new Error('no such biome: ' + textureName);
+        }
+        
+        const x = biomeAtlasIndex % texturesPerRow;
+        const y = Math.floor(biomeAtlasIndex / texturesPerRow);
+        
+        data[i * 4] = x / texturesPerRow * 255;
+        data[i * 4 + 1] = y / texturesPerRow * 255;
+        data[i * 4 + 2] = 0;
+        data[i * 4 + 3] = 255;
+      }
+      // console.log('got uv data texture', data);
+      const texture = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat);
+      texture.minFilter = THREE.NearestFilter;
+      texture.magFilter = THREE.NearestFilter;
+      texture.needsUpdate = true;
+      return texture;
+    })();
+    window.biomeUvDataTexture = biomeUvDataTexture;
 
     const {ktx2Loader} = useLoaders();
     const atlasTexturesArray = await Promise.all(mapNames.map(mapName => new Promise((accept, reject) => {
@@ -1032,6 +1067,7 @@ export default (e) => {
     generator = new TerrainChunkGenerator(this, {
       physics,
       biomeDataTexture,
+      biomeUvDataTexture,
       atlasTextures,
     });
     tracker = new LodChunkTracker(generator, {
