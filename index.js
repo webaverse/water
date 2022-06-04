@@ -364,6 +364,7 @@ const mapNames = [
   'Height',
   'Normal',
   'Roughness',
+  'Emissive',
   'Ambient_Occlusion',
 ];
 const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
@@ -385,7 +386,16 @@ const loadImage = u => new Promise((resolve, reject) => {
   img.onload = () => {
     resolve(img);
   };
-  img.onerror = reject;
+  img.onerror = err => {
+    if (/Emissive/i.test(u)) {
+      const blankCanvas = document.createElement('canvas');
+      blankCanvas.width = 1;
+      blankCanvas.height = 1;
+      resolve(blankCanvas);
+    } else {
+      reject(err);
+    }
+  };
   img.crossOrigin = 'Anonymous';
   img.src = u;
 });
@@ -473,12 +483,12 @@ const bakeBiomesAtlas = async ({
   const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
   downloadFile(atlasJsonBlob, `megatexture-atlas.json`); */
 };
-// window.bakeBiomesAtlas = bakeBiomesAtlas;
+window.bakeBiomesAtlas = bakeBiomesAtlas;
 
 class TerrainMesh extends THREE.Mesh {
   constructor({
     physics,
-    biomeDataTexture,
+    // biomeDataTexture,
     biomeUvDataTexture,
     atlasTextures,
   }) {
@@ -529,6 +539,7 @@ class TerrainMesh extends THREE.Mesh {
     const material = new THREE.MeshStandardMaterial({
       map: new THREE.Texture(),
       normalMap: new THREE.Texture(),
+      emissiveMap: new THREE.Texture(),
       // normalScale: new THREE.Vector2(50, 50),
       // normalMapType: THREE.ObjectSpaceNormalMap,
       bumpMap: new THREE.Texture(),
@@ -593,6 +604,7 @@ vBiomesWeights = biomesWeights;
 #endif
 
 uniform sampler2D Base_Color;
+uniform sampler2D Emissive;
 uniform sampler2D Normal;
 uniform sampler2D Roughness;
 uniform sampler2D Ambient_Occlusion;
@@ -920,14 +932,14 @@ float roughnessFactor = roughness;
 class TerrainChunkGenerator {
   constructor(parent, {
     physics,
-    biomeDataTexture,
+    // biomeDataTexture,
     biomeUvDataTexture,
     atlasTextures,
   } = {}) {
     // parameters
     this.parent = parent;
     this.physics = physics;
-    this.biomeDataTexture = biomeDataTexture;
+    // this.biomeDataTexture = biomeDataTexture;
     this.biomeUvDataTexture = biomeUvDataTexture;
     this.atlasTextures = atlasTextures;
 
@@ -937,7 +949,7 @@ class TerrainChunkGenerator {
 
     this.terrainMesh = new TerrainMesh({
       physics: this.physics,
-      biomeDataTexture: this.biomeDataTexture,
+      // biomeDataTexture: this.biomeDataTexture,
       biomeUvDataTexture: this.biomeUvDataTexture,
       atlasTextures: this.atlasTextures,
     });
@@ -1035,7 +1047,7 @@ export default (e) => {
   let generator = null;
   let tracker = null;
   e.waitUntil((async () => {
-    const biomeDataTexture = (() => {
+    /* const biomeDataTexture = (() => {
       const data = new Uint8Array(256 * 4);
       for (let i = 0; i < biomeSpecs.length; i++) {
         const biomeSpec = biomeSpecs[i];
@@ -1051,7 +1063,7 @@ export default (e) => {
       texture.magFilter = THREE.NearestFilter;
       texture.needsUpdate = true;
       return texture;
-    })();
+    })(); */
     const biomeUvDataTexture = (() => {
       const data = new Uint8Array(256 * 4);
       for (let i = 0; i < biomeSpecs.length; i++) {
@@ -1093,15 +1105,15 @@ export default (e) => {
       // atlasTexturesArray[i].wrapS = THREE.RepeatWrapping;
       // atlasTexturesArray[i].wrapT = THREE.RepeatWrapping;
       const compressedTexture = atlasTexturesArray[i];
-      compressedTexture.encoding = mapNames === 'Base_Color' ? THREE.sRGBEncoding : THREE.LinearEncoding;
-      // compressedTexture.encoding = mapNames === 'Base_Color' ? THREE.LinearEncoding : THREE.LinearEncoding;
+      // compressedTexture.encoding = (mapNames === 'Base_Color' || mapNames === 'Emissive') ? THREE.sRGBEncoding : THREE.LinearEncoding;
       compressedTexture.anisotropy = 16;
+      // compressedTexture.premultiplyAlpha = true;
       atlasTextures[mapNames[i]] = compressedTexture;
     }
 
     generator = new TerrainChunkGenerator(this, {
       physics,
-      biomeDataTexture,
+      // biomeDataTexture,
       biomeUvDataTexture,
       atlasTextures,
     });
