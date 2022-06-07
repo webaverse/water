@@ -476,14 +476,14 @@ const bakeBiomesAtlas = async ({
     document.body.removeChild(canvas);
   }
 
-  /* const atlasJson = {
-    textures: atlasTextures,
-  };
-  const atlasJsonString = JSON.stringify(atlasJson, null, 2);
-  const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
-  downloadFile(atlasJsonBlob, `megatexture-atlas.json`); */
+  // const atlasJson = {
+  //   textures: atlasTextures,
+  // };
+  // const atlasJsonString = JSON.stringify(atlasJson, null, 2);
+  // const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
+  // downloadFile(atlasJsonBlob, `megatexture-atlas.json`);
 };
-window.bakeBiomesAtlas = bakeBiomesAtlas;
+// window.bakeBiomesAtlas = bakeBiomesAtlas;
 
 class TerrainMesh extends THREE.Mesh {
   constructor({
@@ -548,7 +548,7 @@ class TerrainMesh extends THREE.Mesh {
       aoMap: new THREE.Texture(),
       transparent: true,
       onBeforeCompile: (shader) => {
-        console.log('on before compile', shader.fragmentShader);
+        // console.log('on before compile', shader.fragmentShader);
 
         shader.uniforms.biomeUvDataTexture = {
           value: biomeUvDataTexture,
@@ -860,8 +860,7 @@ float roughnessFactor = roughness;
   async addChunk(chunk, {
     signal,
   }) {
-    const lodArray = [1, 1, 1, 1, 1, 1, 1, 1];
-    const meshData = await dcWorkerManager.generateChunk(chunk, lodArray);
+    const meshData = await dcWorkerManager.generateChunk(chunk, chunk.lodArray);
     // console.log('mesh data', meshData);
     signal.throwIfAborted();
     if (meshData) { // non-empty chunk
@@ -964,7 +963,6 @@ class TerrainChunkGenerator {
     return this.terrainMesh.physicsObjects;
   }
   generateChunk(chunk) {
-    // XXX support signal cancellation
     const abortController = new AbortController();
     const {signal} = abortController;
 
@@ -1090,13 +1088,13 @@ export default (e) => {
       texture.needsUpdate = true;
       return texture;
     })();
-    window.biomeUvDataTexture = biomeUvDataTexture;
+    // window.biomeUvDataTexture = biomeUvDataTexture;
 
     const {ktx2Loader} = useLoaders();
     const atlasTexturesArray = await Promise.all(mapNames.map(mapName => new Promise((accept, reject) => {
       ktx2Loader.load(`${biomesKtx2TexturePrefix}build/8k/${mapName}.ktx2`, accept, function onprogress(e) {}, reject);
     })));
-    window.atlasTexturesArray = atlasTexturesArray;
+    // window.atlasTexturesArray = atlasTexturesArray;
     if (!live) return;
     
     const atlasTextures = {};
