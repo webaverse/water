@@ -354,7 +354,27 @@ const biomeSpecs = [
     "liWaterOceanFrozen",
     16777215,
     "Vol_24_2_Snow_Ice_Base_Color"
-  ]
+  ],
+  [
+    "teDirt",
+    0x8d6e63,
+    "Vol_71_1_Stone_Base_Color"
+  ],
+  [
+    "teStone",
+    0x78909c,
+    "Vol_141_6_Terrain_Base_Color"
+  ],
+  [
+    "liWater",
+    0x42a5f5,
+    "Vol_154_3_Water_Base_Color"
+  ],
+  [
+    "liLava",
+    0xef5350,
+    "Vol_28_2_Lava_Base_Color"
+  ],
 ];
 for (const biome of biomeSpecs) {
   biome[2] = biome[2].replace(/Base_Color/, '');
