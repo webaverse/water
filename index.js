@@ -379,7 +379,6 @@ const neededTexturePrefixes = (() => {
   return neededTexturePrefixes;
 })();
 const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length));
-// window.neededTexturePrefixes = neededTexturePrefixes;
 
 const loadImage = u => new Promise((resolve, reject) => {
   const img = new Image();
