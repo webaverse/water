@@ -228,7 +228,7 @@ const biomeSpecs = [
   [
     "biSunflowerPlains",
     11918216,
-    "Vol_11_4_Vegetation_Base_Color"
+    "Vol_113_5_Flower_Base_Color"
   ],
   [
     "biDesertM",
@@ -243,7 +243,7 @@ const biomeSpecs = [
   [
     "biFlowerForest",
     2985545,
-    "Vol_45_1_Tiles_Base_Color"
+    "Vol_11_4_Vegetation_Base_Color"
   ],
   [
     "biTaigaM",
@@ -334,12 +334,12 @@ const biomeSpecs = [
   [
     "teDirt",
     0x8d6e63,
-    "Vol_71_1_Stone_Base_Color"
+    "Vol_26_7_Rocks_Base_Color"
   ],
   [
     "teStone",
     0x78909c,
-    "Vol_141_6_Terrain_Base_Color"
+    "Vol_26_5_Stone_Base_Color"
   ],
 
   [
