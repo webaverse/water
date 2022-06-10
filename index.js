@@ -1046,6 +1046,59 @@ class TerrainChunkGenerator {
   }
 }
 
+window.addAoMesh = async () => {
+  const dcWorkerManager = useDcWorkerManager();
+  const pos = new THREE.Vector3(0, 0, 0);
+  const size = chunkWorldSize * 2;
+  const lod = 1;
+  const aos = await dcWorkerManager.getAoFieldRange(
+    pos.x, pos.y, pos.z,
+    size, size, size,
+    lod,
+  );
+  console.log('got aos', aos);
+
+  const aoTex = new THREE.DataTexture3D(aos, size, size, size);
+
+  const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const geometry = new THREE.InstancedBufferGeometry().copy(boxGeometry);
+  const material = new WebaverseShaderMaterial({
+    uniforms: {
+      uAoTex: {
+        value: aoTex,
+        needsUpdate: true,
+      }
+    },
+    vertexShader: `\
+      varying vec3 vUv;
+
+      void main() {
+        vUv = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `\
+      precision highp float;
+      precision highp int;
+
+      #define PI 3.1415926535897932384626433832795
+
+      uniform sampler3D uAoTex;
+      varying vec2 vUv;
+
+      void main() {
+        vec4 sampleColor = texture3D(uAoTex, vUv);        
+        gl_FragColor = vec4(sampleColor, 0., 0., 1.);
+      }
+    `,
+  });
+  const mesh = new THREE.InstancedMesh(geometry, material);
+  mesh.frustumCulled = false;
+  
+  const scene = useScene();
+  scene.add(mesh);
+};
+
 export default (e) => {
   const app = useApp();
   const physics = usePhysics();
