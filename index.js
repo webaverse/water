@@ -19,7 +19,7 @@ const chunkWorldSize = dcWorkerManager.chunkSize;
 const numLods = 1;
 const bufferSize = 20 * 1024 * 1024;
 
-const textureLoader = new THREE.TextureLoader();
+// const textureLoader = new THREE.TextureLoader();
 const abortError = new Error('chunk disposed');
 const fakeMaterial = new THREE.MeshBasicMaterial({
   color: 0xffffff,
