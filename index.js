@@ -557,7 +557,8 @@ float roughnessFactor = roughness;
         this.allocator.geometry.groups = this.allocator.indexFreeList.getGeometryGroups(); // XXX memory for this can be optimized
       }; */
       const _handleMesh = () => {
-        localSphere.center.set(chunk.x * chunkWorldSize, chunk.y * chunkWorldSize, chunk.z * chunkWorldSize);
+        localSphere.center.set((chunk.x + 0.5) * chunkWorldSize, (chunk.y + 0.5) * chunkWorldSize, (chunk.z + 0.5) * chunkWorldSize)
+          .applyMatrix4(this.matrixWorld);
         localSphere.radius = chunkRadius;
         const geometryBinding = this.allocator.alloc(
           meshData.positions.length,
