@@ -2,7 +2,7 @@ import metaversefile from 'metaversefile';
 import * as THREE from 'three';
 // import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 
-const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useLoaders, useDcWorkerManager, useLodder} = metaversefile;
+const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useLoaders, useInstancing, useDcWorkerManager, useLodder} = metaversefile;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
@@ -495,9 +495,10 @@ const bakeBiomesAtlas = async ({
   // const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
   // downloadFile(atlasJsonBlob, `megatexture-atlas.json`);
 };
-// window.bakeBiomesAtlas = bakeBiomesAtlas;
+window.bakeBiomesAtlas = bakeBiomesAtlas;
 
-class TerrainMesh extends THREE.Mesh {
+const {BatchedMesh} = useInstancing();
+class TerrainMesh extends BatchedMesh {
   constructor({
     physics,
     // biomeDataTexture,
@@ -860,7 +861,7 @@ float roughnessFactor = roughness;
         return shader;
       },
     });
-    super(geometry, [material]); // array is needed for groups support
+    super(geometry, material, allocator);
     this.frustumCulled = false;
 
     this.physics = physics;
@@ -897,17 +898,17 @@ float roughnessFactor = roughness;
         geometry.attributes.biomesWeights.update(biomesWeightsOffset, meshData.biomesWeights.length, meshData.biomesWeights, 0);
         geometry.index.update(indexOffset, meshData.indices.length);
       };
-      const _updateRenderList = () => {
+      /* const _updateRenderList = () => {
         this.allocator.geometry.groups = this.allocator.indexFreeList.getGeometryGroups(); // XXX memory for this can be optimized
-      };
+      }; */
       const _handleMesh = () => {
         const geometryBinding = this.allocator.alloc(meshData.positions.length, meshData.indices.length);
         _renderMeshDataToGeometry(meshData, this.allocator.geometry, geometryBinding);
-        _updateRenderList();
+        // _updateRenderList();
 
         signal.addEventListener('abort', e => {
           this.allocator.free(geometryBinding);
-          _updateRenderList();
+          // _updateRenderList();
         });
       };
       _handleMesh();
