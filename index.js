@@ -12,10 +12,12 @@ const localVector2 = new THREE.Vector3();
 const localQuaternion = new THREE.Quaternion();
 const localMatrix = new THREE.Matrix4();
 const localMatrix2 = new THREE.Matrix4();
-const localColor = new THREE.Color();
+// const localColor = new THREE.Color();
+const localSphere = new THREE.Sphere();
 
 const dcWorkerManager = useDcWorkerManager();
 const chunkWorldSize = dcWorkerManager.chunkSize;
+const chunkRadius = Math.sqrt(chunkWorldSize * chunkWorldSize * 3);
 const numLods = 1;
 const bufferSize = 20 * 1024 * 1024;
 
@@ -148,7 +150,7 @@ const bakeBiomesAtlas = async ({
   // const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
   // downloadFile(atlasJsonBlob, `megatexture-atlas.json`);
 };
-window.bakeBiomesAtlas = bakeBiomesAtlas;
+// window.bakeBiomesAtlas = bakeBiomesAtlas;
 
 const {BatchedMesh} = useInstancing();
 class TerrainMesh extends BatchedMesh {
@@ -555,7 +557,13 @@ float roughnessFactor = roughness;
         this.allocator.geometry.groups = this.allocator.indexFreeList.getGeometryGroups(); // XXX memory for this can be optimized
       }; */
       const _handleMesh = () => {
-        const geometryBinding = this.allocator.alloc(meshData.positions.length, meshData.indices.length);
+        localSphere.center.set(chunk.x * chunkWorldSize, chunk.y * chunkWorldSize, chunk.z * chunkWorldSize);
+        localSphere.radius = chunkRadius;
+        const geometryBinding = this.allocator.alloc(
+          meshData.positions.length,
+          meshData.indices.length,
+          localSphere
+        );
         _renderMeshDataToGeometry(meshData, this.allocator.geometry, geometryBinding);
         // _updateRenderList();
 
