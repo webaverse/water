@@ -77,6 +77,8 @@ function downloadFile(file, filename) {
   tempLink.click();
   document.body.removeChild(tempLink);
 }
+// this method generates a deduplicted texture atlas for the texture sets used in the mesh
+// the output can be used by ./scripts/build-megatexture-atlas.sh to turn it into a KTX2 texture atlas
 const bakeBiomesAtlas = async ({
   size = 8 * 1024,
 } = {}) => {
