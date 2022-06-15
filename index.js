@@ -601,20 +601,19 @@ float roughnessFactor = roughness;
           this.physicsObjects.splice(this.physicsObjects.indexOf(physicsObject), 1);
         });
       };
-      await _handlePhysics();
+      _handlePhysics();
     }
   }
 }
 
 class TerrainChunkGenerator {
-  constructor(parent, {
+  constructor({
     physics,
     // biomeDataTexture,
     biomeUvDataTexture,
     atlasTextures,
   } = {}) {
     // parameters
-    this.parent = parent;
     this.physics = physics;
     // this.biomeDataTexture = biomeDataTexture;
     this.biomeUvDataTexture = biomeUvDataTexture;
@@ -840,7 +839,7 @@ export default (e) => {
       atlasTextures[mapNames[i]] = compressedTexture;
     }
 
-    generator = new TerrainChunkGenerator(this, {
+    generator = new TerrainChunkGenerator({
       physics,
       // biomeDataTexture,
       biomeUvDataTexture,
@@ -860,7 +859,7 @@ export default (e) => {
 
   // console.log('got hit tracker', app.hitTracker);
   app.addEventListener('hit', e => {
-    generator && generator.hit(e);
+    generator && tracker && generator.hit(e, tracker);
   });
 
   useFrame(() => {
