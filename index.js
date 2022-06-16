@@ -765,16 +765,16 @@ window.addAoMesh = async () => {
     size, size, size,
     lod,
   );
-  const aos2 = new Float32Array(aos.length);
+  /* const aos2 = new Float32Array(aos.length);
   for (let i = 0; i < aos.length; i++) {
     aos2[i] = aos[i] / 255;
-  }
+  } */
   // console.log('got aos', aos, size);
 
-  const aoTex = new THREE.DataTexture3D(aos2, size, size, size);
+  const aoTex = new THREE.DataTexture3D(aos, size, size, size);
   aoTex.format = THREE.RedFormat;
-  // aoTex.type = THREE.UnsignedByteType;
-  aoTex.type = THREE.FloatType;
+  aoTex.type = THREE.UnsignedByteType;
+  // aoTex.type = THREE.FloatType;
   aoTex.needsUpdate = true;
 
   /* setTimeout(() => {
