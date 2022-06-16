@@ -1,9 +1,10 @@
 import metaversefile from 'metaversefile';
+import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 // import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 import biomeSpecs from './biomes.js';
 
-const {useApp, useLocalPlayer, useFrame, useCleanup, usePhysics, useLoaders, useInstancing, useDcWorkerManager, useLodder} = metaversefile;
+const {useApp, useLocalPlayer, useScene, useRenderer, useFrame, useMaterials, useCleanup, usePhysics, useLoaders, useInstancing, useDcWorkerManager, useLodder} = metaversefile;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
@@ -753,6 +754,8 @@ class TerrainChunkGenerator {
 }
 
 window.addAoMesh = async () => {
+  const {WebaverseShaderMaterial} = useMaterials();
+
   const dcWorkerManager = useDcWorkerManager();
   const pos = new THREE.Vector3(0, 0, 0);
   const size = chunkWorldSize * 2;
@@ -762,12 +765,43 @@ window.addAoMesh = async () => {
     size, size, size,
     lod,
   );
-  console.log('got aos', aos);
+  const aos2 = new Float32Array(aos.length);
+  for (let i = 0; i < aos.length; i++) {
+    aos2[i] = aos[i] / 255;
+  }
+  // console.log('got aos', aos, size);
 
-  const aoTex = new THREE.DataTexture3D(aos, size, size, size);
+  const aoTex = new THREE.DataTexture3D(aos2, size, size, size);
+  aoTex.format = THREE.RedFormat;
+  // aoTex.type = THREE.UnsignedByteType;
+  aoTex.type = THREE.FloatType;
+  aoTex.needsUpdate = true;
 
-  const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const geometry = new THREE.InstancedBufferGeometry().copy(boxGeometry);
+  /* setTimeout(() => {
+    const renderer = useRenderer();
+
+    const position = new THREE.Vector3(6, 6, 6);
+    const sourceBox = new THREE.Box3(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(3, 3, 3)
+    );
+    const w = sourceBox.max.x - sourceBox.min.x;
+    const h = sourceBox.max.y - sourceBox.min.y;
+    const d = sourceBox.max.z - sourceBox.min.z;
+    const damageTex = new THREE.DataTexture3D(
+      new Uint8Array(w * h * d).fill(128),
+      w, h, d
+    );
+    damageTex.format = THREE.RedFormat;
+    damageTex.type = THREE.UnsignedByteType;
+    const level = 0;
+    renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level);
+  }, 1000); */
+
+  const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
+    .scale(0.9, 0.9, 0.9);
+  const geometry = new THREE.InstancedBufferGeometry()
+    .copy(boxGeometry);
   const material = new WebaverseShaderMaterial({
     uniforms: {
       uAoTex: {
@@ -776,29 +810,56 @@ window.addAoMesh = async () => {
       }
     },
     vertexShader: `\
-      varying vec3 vUv;
+      flat varying vec3 vUv;
+      varying vec3 vNormal;
+
+      const float size = ${size.toFixed(8)};
 
       void main() {
-        vUv = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        // vUv = position / size;
+
+        float instanceId = float(gl_InstanceID);
+        float x = mod(instanceId, size);
+        instanceId -= x;
+        instanceId /= size;
+        float y = mod(instanceId, size);
+        instanceId -= y;
+        instanceId /= size;
+        float z = instanceId;
+
+        vec3 p = vec3(x, y, z);
+        vUv = (p + 0.5) / size;
+        vNormal = normal;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position + p, 1.0);
       }
     `,
     fragmentShader: `\
       precision highp float;
       precision highp int;
-
-      #define PI 3.1415926535897932384626433832795
+      precision highp sampler3D;
 
       uniform sampler3D uAoTex;
-      varying vec2 vUv;
+      flat varying vec3 vUv;
+      varying vec3 vNormal;
+
+      const float size = ${size.toFixed(8)};
 
       void main() {
-        vec4 sampleColor = texture3D(uAoTex, vUv);        
-        gl_FragColor = vec4(sampleColor, 0., 0., 1.);
+        vec4 sampleColor = texture(uAoTex, vUv);
+        if (sampleColor.r > 0.) {        
+          gl_FragColor = vec4(vUv, sampleColor.r);
+          // gl_FragColor = vec4(vUv, 1.);
+        } else {
+          discard;
+        }
       }
     `,
+    transparent: true,
+    // depthWrite: false,
+    side: THREE.DoubleSide,
   });
-  const mesh = new THREE.InstancedMesh(geometry, material);
+  const count = size * size * size;
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
   mesh.frustumCulled = false;
   
   const scene = useScene();
@@ -833,6 +894,7 @@ export default (e) => {
       texture.needsUpdate = true;
       return texture;
     })(); */
+    // this small texture maps biome indexes in the geometry to biome uvs in the atlas texture
     const biomeUvDataTexture = (() => {
       const data = new Uint8Array(256 * 4);
       for (let i = 0; i < biomeSpecs.length; i++) {
