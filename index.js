@@ -753,119 +753,6 @@ class TerrainChunkGenerator {
   }
 }
 
-window.addAoMesh = async () => {
-  const {WebaverseShaderMaterial} = useMaterials();
-
-  const dcWorkerManager = useDcWorkerManager();
-  const pos = new THREE.Vector3(0, 0, 0);
-  const size = chunkWorldSize * 2;
-  const lod = 1;
-  const aos = await dcWorkerManager.getAoFieldRange(
-    pos.x, pos.y, pos.z,
-    size, size, size,
-    lod,
-  );
-  /* const aos2 = new Float32Array(aos.length);
-  for (let i = 0; i < aos.length; i++) {
-    aos2[i] = aos[i] / 255;
-  } */
-  // console.log('got aos', aos, size);
-
-  const aoTex = new THREE.DataTexture3D(aos, size, size, size);
-  aoTex.format = THREE.RedFormat;
-  aoTex.type = THREE.UnsignedByteType;
-  // aoTex.type = THREE.FloatType;
-  aoTex.needsUpdate = true;
-
-  /* setTimeout(() => {
-    const renderer = useRenderer();
-
-    const position = new THREE.Vector3(6, 6, 6);
-    const sourceBox = new THREE.Box3(
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(3, 3, 3)
-    );
-    const w = sourceBox.max.x - sourceBox.min.x;
-    const h = sourceBox.max.y - sourceBox.min.y;
-    const d = sourceBox.max.z - sourceBox.min.z;
-    const damageTex = new THREE.DataTexture3D(
-      new Uint8Array(w * h * d).fill(128),
-      w, h, d
-    );
-    damageTex.format = THREE.RedFormat;
-    damageTex.type = THREE.UnsignedByteType;
-    const level = 0;
-    renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level);
-  }, 1000); */
-
-  const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
-    .scale(0.9, 0.9, 0.9);
-  const geometry = new THREE.InstancedBufferGeometry()
-    .copy(boxGeometry);
-  const material = new WebaverseShaderMaterial({
-    uniforms: {
-      uAoTex: {
-        value: aoTex,
-        needsUpdate: true,
-      }
-    },
-    vertexShader: `\
-      flat varying vec3 vUv;
-      varying vec3 vNormal;
-
-      const float size = ${size.toFixed(8)};
-
-      void main() {
-        // vUv = position / size;
-
-        float instanceId = float(gl_InstanceID);
-        float x = mod(instanceId, size);
-        instanceId -= x;
-        instanceId /= size;
-        float y = mod(instanceId, size);
-        instanceId -= y;
-        instanceId /= size;
-        float z = instanceId;
-
-        vec3 p = vec3(x, y, z);
-        vUv = (p + 0.5) / size;
-        vNormal = normal;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position + p, 1.0);
-      }
-    `,
-    fragmentShader: `\
-      precision highp float;
-      precision highp int;
-      precision highp sampler3D;
-
-      uniform sampler3D uAoTex;
-      flat varying vec3 vUv;
-      varying vec3 vNormal;
-
-      const float size = ${size.toFixed(8)};
-
-      void main() {
-        vec4 sampleColor = texture(uAoTex, vUv);
-        if (sampleColor.r > 0.) {        
-          gl_FragColor = vec4(vUv, sampleColor.r);
-          // gl_FragColor = vec4(vUv, 1.);
-        } else {
-          discard;
-        }
-      }
-    `,
-    transparent: true,
-    // depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const count = size * size * size;
-  const mesh = new THREE.InstancedMesh(geometry, material, count);
-  mesh.frustumCulled = false;
-  
-  const scene = useScene();
-  scene.add(mesh);
-};
-
 export default (e) => {
   const app = useApp();
   const physics = usePhysics();
@@ -972,7 +859,7 @@ export default (e) => {
         .premultiply(
           localMatrix2.copy(app.matrixWorld).invert()
         )
-        .decompose(localVector, localQuaternion, localVector2)
+        .decompose(localVector, localQuaternion, localVector2);
       tracker.update(localVector);
     }
   });
@@ -981,6 +868,250 @@ export default (e) => {
     live = false;
     tracker && tracker.destroy();
   });
+
+  window.addAoMesh = async () => {
+    const {WebaverseShaderMaterial} = useMaterials();
+    const dcWorkerManager = useDcWorkerManager();
+    const localPlayer = useLocalPlayer();
+  
+    localMatrix.copy(localPlayer.matrixWorld)
+      .premultiply(
+        localMatrix2.copy(app.matrixWorld).invert()
+      )
+      .decompose(localVector, localQuaternion, localVector2);
+    localVector.x = Math.floor(localVector.x / chunkWorldSize) * chunkWorldSize;
+    localVector.y = Math.floor(localVector.y / chunkWorldSize) * chunkWorldSize;
+    localVector.z = Math.floor(localVector.z / chunkWorldSize) * chunkWorldSize;
+
+    const p = localVector.clone();
+    const size = chunkWorldSize;
+    const lod = 1;
+    const aos = await dcWorkerManager.getAoFieldRange(
+      p.x, p.y, p.z,
+      size, size, size,
+      lod,
+    );
+    /* const aos2 = new Float32Array(aos.length);
+    for (let i = 0; i < aos.length; i++) {
+      aos2[i] = aos[i] / 255;
+    } */
+    // console.log('got aos', aos, size);
+  
+    const aoTex = new THREE.DataTexture3D(aos, size, size, size);
+    aoTex.format = THREE.RedFormat;
+    aoTex.type = THREE.UnsignedByteType;
+    // aoTex.type = THREE.FloatType;
+    aoTex.needsUpdate = true;
+  
+    /* setTimeout(() => {
+      const renderer = useRenderer();
+  
+      const position = new THREE.Vector3(6, 6, 6);
+      const sourceBox = new THREE.Box3(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(3, 3, 3)
+      );
+      const w = sourceBox.max.x - sourceBox.min.x;
+      const h = sourceBox.max.y - sourceBox.min.y;
+      const d = sourceBox.max.z - sourceBox.min.z;
+      const damageTex = new THREE.DataTexture3D(
+        new Uint8Array(w * h * d).fill(128),
+        w, h, d
+      );
+      damageTex.format = THREE.RedFormat;
+      damageTex.type = THREE.UnsignedByteType;
+      const level = 0;
+      renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level);
+    }, 1000); */
+  
+    const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
+      .scale(0.9, 0.9, 0.9);
+    const geometry = new THREE.InstancedBufferGeometry()
+      .copy(boxGeometry);
+    const material = new WebaverseShaderMaterial({
+      uniforms: {
+        uAoTex: {
+          value: aoTex,
+          needsUpdate: true,
+        }
+      },
+      vertexShader: `\
+        flat varying vec3 vUv;
+        varying vec3 vNormal;
+  
+        const float size = ${size.toFixed(8)};
+  
+        void main() {
+          // vUv = position / size;
+  
+          float instanceId = float(gl_InstanceID);
+          float x = mod(instanceId, size);
+          instanceId -= x;
+          instanceId /= size;
+          float y = mod(instanceId, size);
+          instanceId -= y;
+          instanceId /= size;
+          float z = instanceId;
+  
+          vec3 p = vec3(x, y, z);
+          vUv = (p + 0.5) / size;
+          vNormal = normal;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position + p, 1.0);
+        }
+      `,
+      fragmentShader: `\
+        precision highp float;
+        precision highp int;
+        precision highp sampler3D;
+  
+        uniform sampler3D uAoTex;
+        flat varying vec3 vUv;
+        varying vec3 vNormal;
+  
+        const float size = ${size.toFixed(8)};
+  
+        void main() {
+          vec4 sampleColor = texture(uAoTex, vUv);
+          if (sampleColor.r > 0.) {        
+            gl_FragColor = vec4(vUv, sampleColor.r);
+          } else {
+            discard;
+          }
+        }
+      `,
+      transparent: true,
+      // depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const count = size * size * size;
+    const mesh = new THREE.InstancedMesh(geometry, material, count);
+    mesh.position.copy(p);
+    app.add(mesh);
+    mesh.updateMatrixWorld();
+  };
+  window.addSkylightMesh = async () => {
+    const {WebaverseShaderMaterial} = useMaterials();
+    const dcWorkerManager = useDcWorkerManager();
+    const localPlayer = useLocalPlayer();
+  
+    localMatrix.copy(localPlayer.matrixWorld)
+      .premultiply(
+        localMatrix2.copy(app.matrixWorld).invert()
+      )
+      .decompose(localVector, localQuaternion, localVector2);
+    localVector.x = Math.floor(localVector.x / chunkWorldSize) * chunkWorldSize;
+    localVector.y = Math.floor(localVector.y / chunkWorldSize) * chunkWorldSize;
+    localVector.z = Math.floor(localVector.z / chunkWorldSize) * chunkWorldSize;
+
+    const p = localVector.clone();
+    const size = chunkWorldSize;
+    const lod = 1;
+    const skylights = await dcWorkerManager.getSkylightFieldRange(
+      p.x, p.y, p.z,
+      size, size, size,
+      lod,
+    );
+    // console.log('got skylights', skylights, size);
+    // window.skylights = skylights;
+    /* const aos2 = new Float32Array(aos.length);
+    for (let i = 0; i < aos.length; i++) {
+      aos2[i] = aos[i] / 255;
+    } */
+    // console.log('got aos', aos, size);
+  
+    const skylightTex = new THREE.DataTexture3D(skylights, size, size, size);
+    skylightTex.format = THREE.RedFormat;
+    skylightTex.type = THREE.UnsignedByteType;
+    // skylightTex.type = THREE.FloatType;
+    skylightTex.needsUpdate = true;
+  
+    /* setTimeout(() => {
+      const renderer = useRenderer();
+  
+      const position = new THREE.Vector3(6, 6, 6);
+      const sourceBox = new THREE.Box3(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(3, 3, 3)
+      );
+      const w = sourceBox.max.x - sourceBox.min.x;
+      const h = sourceBox.max.y - sourceBox.min.y;
+      const d = sourceBox.max.z - sourceBox.min.z;
+      const damageTex = new THREE.DataTexture3D(
+        new Uint8Array(w * h * d).fill(128),
+        w, h, d
+      );
+      damageTex.format = THREE.RedFormat;
+      damageTex.type = THREE.UnsignedByteType;
+      const level = 0;
+      renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level);
+    }, 1000); */
+  
+    const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
+      .scale(0.9, 0.9, 0.9);
+    const geometry = new THREE.InstancedBufferGeometry()
+      .copy(boxGeometry);
+    const material = new WebaverseShaderMaterial({
+      uniforms: {
+        uSkylightTex: {
+          value: skylightTex,
+          needsUpdate: true,
+        }
+      },
+      vertexShader: `\
+        flat varying vec3 vUv;
+        varying vec3 vNormal;
+  
+        const float size = ${size.toFixed(8)};
+  
+        void main() {
+          // vUv = position / size;
+  
+          float instanceId = float(gl_InstanceID);
+          float x = mod(instanceId, size);
+          instanceId -= x;
+          instanceId /= size;
+          float y = mod(instanceId, size);
+          instanceId -= y;
+          instanceId /= size;
+          float z = instanceId;
+  
+          vec3 p = vec3(x, y, z);
+          vUv = (p + 0.5) / size;
+          vNormal = normal;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position + p, 1.0);
+        }
+      `,
+      fragmentShader: `\
+        precision highp float;
+        precision highp int;
+        precision highp sampler3D;
+  
+        uniform sampler3D uSkylightTex;
+        flat varying vec3 vUv;
+        varying vec3 vNormal;
+  
+        const float size = ${size.toFixed(8)};
+  
+        void main() {
+          vec4 sampleColor = texture(uSkylightTex, vUv);
+          if (sampleColor.r > 0.) {        
+            gl_FragColor = vec4(vUv, sampleColor.r);
+          } else {
+            discard;
+          }
+        }
+      `,
+      transparent: true,
+      // depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const count = size * size * size;
+    const mesh = new THREE.InstancedMesh(geometry, material, count);
+    mesh.position.copy(p);
+    mesh.frustumCulled = false;    
+    app.add(mesh);
+    mesh.updateMatrixWorld();
+  };
 
   return app
 }
