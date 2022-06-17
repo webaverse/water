@@ -663,19 +663,21 @@ float roughnessFactor = roughness;
   
   const float discount = 0.;
   const float maxPossible = (27. - discount);
+  const float baseAo = 0.3;
   aoValue -= discount;
   aoValue /= maxPossible;
+  aoValue = baseAo + aoValue * (1. - baseAo);
   aoValue = ceil(aoValue * numLightBands) / numLightBands;
-  diffuseColor.rgb = vec3(aoValue); // vec3(aoValue); // vec3(aoValue * 255. / 27.);
+  diffuseColor.rgb *= aoValue;
 
   // diffuseColor.rgb += uvLight;
-  diffuseColor.a = 1.;
-  diffuseColor.rgb += uvLight * 0.05;
+  // diffuseColor.rgb += uvLight * 0.05;
   // vec4 aoColor = texture(uAoTex, uvLight);
 
   if (uvLight.x <= 0. || uvLight.x >= uTerrainSize || uvLight.z <= 0. || uvLight.z >= uTerrainSize || uvLight.y <= 0. || uvLight.y >= uTerrainSize) {
     diffuseColor.rgb = vec3(0.);
   }
+  diffuseColor.a = 1.;
 }
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <aomap_fragment>`, `\
