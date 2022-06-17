@@ -785,6 +785,20 @@ float roughnessFactor = roughness;
       _handlePhysics();
     }
   }
+  updateCoord(coord, min2xCoord) {
+    const lastPosition = this.lightBasePosition.clone();
+    const newPosition = min2xCoord.clone().multiplyScalar(chunkWorldSize);
+    const delta = newPosition.clone()
+      .sub(lastPosition);
+    
+    console.log('got', delta.toArray().join(','));
+
+    /* const oldHeightfieldPosition = localVector2D.copy(material.uniforms.uHeightfieldMinPosition.value).clone();
+    const newHeightfieldPosition = localVector2D2.set(min2xCoord.x, min2xCoord.z).clone()
+      .multiplyScalar(chunkWorldSize);
+    const delta = localVector2D3.copy(newHeightfieldPosition).clone()
+      .sub(oldHeightfieldPosition); */
+  }
 }
 
 class TerrainChunkGenerator {
@@ -1026,7 +1040,7 @@ export default (e) => {
 
   const coordupdate = e => {
     const {coord, min2xCoord} = e.data;
-    generator.updateCoord(coord, min2xCoord);
+    generator.terrainMesh.updateCoord(coord, min2xCoord);
   };
 
   useFrame(() => {
