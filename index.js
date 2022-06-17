@@ -745,16 +745,6 @@ float roughnessFactor = roughness;
           const level = 0;
 
           {
-            /* console.log(
-              'copy texture',
-              position.toArray().join(','),
-              meshData.skylights.slice(),
-              meshData.skylights.filter(m => m > 0),
-              meshData.aos.filter(m => m > 0)
-            ); */
-
-            // console.log('copy texture', chunk.toArray().join(','), position.toArray().join(','));
-
             const skylightSrcTex = new THREE.DataTexture3D(meshData.skylights, chunkWorldSize, chunkWorldSize, chunkWorldSize);
             skylightSrcTex.format = THREE.RedFormat;
             skylightSrcTex.type = THREE.UnsignedByteType;
