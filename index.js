@@ -423,7 +423,6 @@ uniform float uTerrainSize;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
 varying vec3 vPosition;
-varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 varying vec3 vUvLight;
 
@@ -587,9 +586,9 @@ vec4 triplanarNormal(sampler2D Normal, vec3 position, vec3 normal) {
 		// vec2 dSTdx = dFdx( vUv );
 		// vec2 dSTdy = dFdy( vUv );
 
-		float Hll = bumpScale * triplanarMap( Normal, vWorldPosition, vWorldNormal ).x;
-		float dBx = bumpScale * triplanarMapDx( Normal, vWorldPosition, vWorldNormal ).x - Hll;
-		float dBy = bumpScale * triplanarMapDy( Normal, vWorldPosition, vWorldNormal ).x - Hll;
+		float Hll = bumpScale * triplanarMap( Normal, vPosition, vWorldNormal ).x;
+		float dBx = bumpScale * triplanarMapDx( Normal, vPosition, vWorldNormal ).x - Hll;
+		float dBy = bumpScale * triplanarMapDy( Normal, vPosition, vWorldNormal ).x - Hll;
     return vec2( dBx, dBy );
 	}
 	vec3 perturbNormalArb( vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection ) {
@@ -608,14 +607,14 @@ vec4 triplanarNormal(sampler2D Normal, vec3 position, vec3 normal) {
         shader.fragmentShader = shader.fragmentShader.replace(`#include <roughnessmap_fragment>`, `\
 float roughnessFactor = roughness;
 #ifdef USE_ROUGHNESSMAP
-	vec4 texelRoughness = triplanarMap( Roughness, vWorldPosition, vWorldNormal );
+	vec4 texelRoughness = triplanarMap( Roughness, vPosition, vWorldNormal );
 	// reads channel G, compatible with a combined OcclusionRoughnessMetallic (RGB) texture
 	roughnessFactor *= texelRoughness.g;
 #endif
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <normal_fragment_maps>`, `\
 #ifdef OBJECTSPACE_NORMALMAP
-	normal = triplanarNormal(Normal, vWorldPosition, vWorldNormal).xyz /*texture2D( normalMap, vUv ).xyz*/ * 2.0 - 1.0; // overrides both flatShading and attribute normals
+	normal = triplanarNormal(Normal, vPosition, vWorldNormal).xyz /*texture2D( normalMap, vUv ).xyz*/ * 2.0 - 1.0; // overrides both flatShading and attribute normals
 	#ifdef FLIP_SIDED
 		normal = - normal;
 	#endif
@@ -624,7 +623,7 @@ float roughnessFactor = roughness;
 	#endif
 	normal = normalize( normalMatrix * normal ) * 10.;
 #elif defined( TANGENTSPACE_NORMALMAP )
-	vec3 mapN = triplanarNormal(Normal, vWorldPosition, vWorldNormal).xyz /*texture2D( normalMap, vUv ).xyz*/ * 2.0 - 1.0;
+	vec3 mapN = triplanarNormal(Normal, vPosition, vWorldNormal).xyz /*texture2D( normalMap, vUv ).xyz*/ * 2.0 - 1.0;
 	mapN.xy *= normalScale;
 	#ifdef USE_TANGENT
 		normal = normalize( vTBN * mapN );
@@ -637,7 +636,7 @@ float roughnessFactor = roughness;
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_fragment>`, `\
 #ifdef USE_MAP
-  vec4 sampledDiffuseColor = triplanarMap(Base_Color, vWorldPosition, vWorldNormal);
+  vec4 sampledDiffuseColor = triplanarMap(Base_Color, vPosition, vWorldNormal);
   sampledDiffuseColor.a = 1.;
   #ifdef DECODE_VIDEO_TEXTURE
     // inline sRGB decode (TODO: Remove this code when https://crbug.com/1256340 is solved)
@@ -702,7 +701,7 @@ float roughnessFactor = roughness;
         shader.fragmentShader = shader.fragmentShader.replace(`#include <aomap_fragment>`, `\
 #ifdef USE_AOMAP
   // reads channel R, compatible with a combined OcclusionRoughnessMetallic (RGB) texture
-  float ambientOcclusion = ( triplanarMap( Ambient_Occlusion, vWorldPosition, vWorldNormal ).r /* * - 1.0 */ ) * aoMapIntensity /* + 1.0 */;
+  float ambientOcclusion = ( triplanarMap( Ambient_Occlusion, vPosition, vWorldNormal ).r /* * - 1.0 */ ) * aoMapIntensity /* + 1.0 */;
   reflectedLight.indirectDiffuse *= ambientOcclusion;
   #if defined( USE_ENVMAP ) && defined( STANDARD )
     float dotNV = saturate( dot( geometry.normal, geometry.viewDir ) );
