@@ -685,7 +685,7 @@ float roughnessFactor = roughness;
   }
 
   // apply lighting
-  lightValue *= 1.2;
+  lightValue *= 2.;
   // lightValue = ceil(lightValue * numLightBands) / numLightBands;
   diffuseColor.rgb *= lightValue;
 
