@@ -675,7 +675,7 @@ float roughnessFactor = roughness;
     
     const float discount = 0.;
     const float maxAo = (27. - discount);
-    const float baseAo = 0.5;
+    const float baseAo = 0.3;
     // const float baseAo = 0.;
     aoValue -= discount;
     aoValue /= maxAo;
