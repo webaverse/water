@@ -31,7 +31,7 @@ const lightBasePosition = new THREE.Vector3(
   -terrainSize/2
 );
 
-let localApp = null;
+/* let localApp = null;
 const addSkylightMesh = async (skylightTex, p, size) => {
   const {WebaverseShaderMaterial} = useMaterials();  
   const app = localApp;
@@ -102,7 +102,7 @@ const addSkylightMesh = async (skylightTex, p, size) => {
   mesh.frustumCulled = false;
   app.add(mesh);
   mesh.updateMatrixWorld();
-};
+}; */
 
 // const textureLoader = new THREE.TextureLoader();
 const abortError = new Error('chunk disposed');
@@ -1001,7 +1001,7 @@ class TerrainChunkGenerator {
 
 export default (e) => {
   const app = useApp();
-  localApp = app;
+  // localApp = app;
   const physics = usePhysics();
   const {LodChunkTracker} = useLodder();
 
