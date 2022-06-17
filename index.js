@@ -581,9 +581,6 @@ float roughnessFactor = roughness;
         geometry.attributes.biomesWeights.update(biomesWeightsOffset, meshData.biomesWeights.length, meshData.biomesWeights, 0);
         geometry.index.update(indexOffset, meshData.indices.length);
       };
-      /* const _updateRenderList = () => {
-        this.allocator.geometry.groups = this.allocator.indexFreeList.getGeometryGroups(); // XXX memory for this can be optimized
-      }; */
       const _handleMesh = () => {
         localSphere.center.set((chunk.x + 0.5) * chunkWorldSize, (chunk.y + 0.5) * chunkWorldSize, (chunk.z + 0.5) * chunkWorldSize)
           .applyMatrix4(this.matrixWorld);
@@ -594,11 +591,9 @@ float roughnessFactor = roughness;
           localSphere
         );
         _renderMeshDataToGeometry(meshData, this.allocator.geometry, geometryBinding);
-        // _updateRenderList();
 
         signal.addEventListener('abort', e => {
           this.allocator.free(geometryBinding);
-          // _updateRenderList();
         });
       };
       _handleMesh();
@@ -933,7 +928,7 @@ export default (e) => {
         uAoTex: {
           value: aoTex,
           needsUpdate: true,
-        }
+        },
       },
       vertexShader: `\
         flat varying vec3 vUv;
