@@ -1,26 +1,136 @@
 import metaversefile from 'metaversefile';
-import { useSyncExternalStore } from 'react';
+// import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 // import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 import biomeSpecs from './biomes.js';
 
 const {useApp, useLocalPlayer, useScene, useRenderer, useFrame, useMaterials, useCleanup, usePhysics, useLoaders, useInstancing, useDcWorkerManager, useLodder} = metaversefile;
 
-const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
+// const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
 const localVector = new THREE.Vector3();
 const localVector2 = new THREE.Vector3();
+const localVector3 = new THREE.Vector3();
 const localQuaternion = new THREE.Quaternion();
 const localMatrix = new THREE.Matrix4();
 const localMatrix2 = new THREE.Matrix4();
 // const localColor = new THREE.Color();
 const localSphere = new THREE.Sphere();
+const localBox = new THREE.Box3();
 
 const dcWorkerManager = useDcWorkerManager();
 const chunkWorldSize = dcWorkerManager.chunkSize;
+const terrainSize = chunkWorldSize * 4;
 const chunkRadius = Math.sqrt(chunkWorldSize * chunkWorldSize * 3);
 const numLods = 1;
 const bufferSize = 20 * 1024 * 1024;
+
+const lightBasePosition = new THREE.Vector3(
+  -terrainSize/2,
+  terrainSize,
+  -terrainSize/2
+);
+
+let localApp = null;
+const addSkylightMesh = async (skylightTex, p, size) => {
+  const {WebaverseShaderMaterial} = useMaterials();  
+  const app = localApp;
+  // console.log('got skylights', skylights, size);
+  // window.skylights = skylights;
+  /* const aos2 = new Float32Array(aos.length);
+  for (let i = 0; i < aos.length; i++) {
+    aos2[i] = aos[i] / 255;
+  } */
+  // console.log('got aos', aos, size);
+
+  /* setTimeout(() => {
+    const renderer = useRenderer();
+
+    const position = new THREE.Vector3(6, 6, 6);
+    const sourceBox = new THREE.Box3(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(3, 3, 3)
+    );
+    const w = sourceBox.max.x - sourceBox.min.x;
+    const h = sourceBox.max.y - sourceBox.min.y;
+    const d = sourceBox.max.z - sourceBox.min.z;
+    const damageTex = new THREE.DataTexture3D(
+      new Uint8Array(w * h * d).fill(128),
+      w, h, d
+    );
+    damageTex.format = THREE.RedFormat;
+    damageTex.type = THREE.UnsignedByteType;
+    const level = 0;
+    renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level);
+  }, 1000); */
+
+  const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
+    .scale(0.9, 0.9, 0.9);
+  const geometry = new THREE.InstancedBufferGeometry()
+    .copy(boxGeometry);
+  const material = new WebaverseShaderMaterial({
+    uniforms: {
+      uSkylightTex: {
+        value: skylightTex,
+        needsUpdate: true,
+      }
+    },
+    vertexShader: `\
+      flat varying vec3 vUv;
+      varying vec3 vNormal;
+
+      const float size = ${size.toFixed(8)};
+
+      void main() {
+        // vUv = position / size;
+
+        float instanceId = float(gl_InstanceID);
+        float x = mod(instanceId, size);
+        instanceId -= x;
+        instanceId /= size;
+        float y = mod(instanceId, size);
+        instanceId -= y;
+        instanceId /= size;
+        float z = instanceId;
+
+        vec3 p = vec3(x, y, z);
+        vUv = (p + 0.5) / size;
+        vNormal = normal;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position + p, 1.0);
+      }
+    `,
+    fragmentShader: `\
+      precision highp float;
+      precision highp int;
+      precision highp sampler3D;
+
+      uniform sampler3D uSkylightTex;
+      flat varying vec3 vUv;
+      varying vec3 vNormal;
+
+      const float size = ${size.toFixed(8)};
+
+      void main() {
+        vec4 sampleColor = texture(uSkylightTex, vUv);
+        if (sampleColor.r > 0.) {        
+          gl_FragColor = vec4(vUv, sampleColor.r);
+          // gl_FragColor.a = 1.;
+        } else {
+          discard;
+        }
+      }
+    `,
+    transparent: true,
+    // depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const count = size * size * size;
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.position.copy(p);
+  mesh.frustumCulled = false;
+  app.add(mesh);
+  mesh.updateMatrixWorld();
+};
 
 // const textureLoader = new THREE.TextureLoader();
 const abortError = new Error('chunk disposed');
@@ -208,6 +318,33 @@ class TerrainMesh extends BatchedMesh {
       baseUrl + 'assets/textures/GrassNormal1.png'
     )
     grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping */
+
+    const skylightData = new Uint8Array(terrainSize * terrainSize * terrainSize)//.fill(1);
+    const skylightTex = new THREE.DataTexture3D(skylightData, terrainSize, terrainSize, terrainSize);
+    skylightTex.format = THREE.RedFormat;
+    skylightTex.type = THREE.UnsignedByteType;
+    skylightTex.minFilter = THREE.LinearFilter;
+    skylightTex.magFilter = THREE.LinearFilter;
+    // skylightTex.minFilter = THREE.NearestFilter;
+    // skylightTex.magFilter = THREE.NearestFilter;
+    skylightTex.flipY = false;
+    skylightTex.needsUpdate = true;
+    skylightTex.generateMipmaps = false;
+
+    addSkylightMesh(skylightTex, lightBasePosition, terrainSize);
+
+    const aoData = new Uint8Array(terrainSize * terrainSize * terrainSize)//.fill(1);
+    const aoTex = new THREE.DataTexture3D(aoData, terrainSize, terrainSize, terrainSize);
+    aoTex.format = THREE.RedFormat;
+    aoTex.type = THREE.UnsignedByteType;
+    aoTex.minFilter = THREE.LinearFilter;
+    aoTex.magFilter = THREE.LinearFilter;
+    // aoTex.minFilter = THREE.NearestFilter;
+    // aoTex.magFilter = THREE.NearestFilter;
+    aoTex.flipY = false;
+    aoTex.needsUpdate = true;
+    aoTex.generateMipmaps = false;
+
     const material = new THREE.MeshStandardMaterial({
       map: new THREE.Texture(),
       normalMap: new THREE.Texture(),
@@ -218,21 +355,38 @@ class TerrainMesh extends BatchedMesh {
       // bumpScale: 1,
       roughnessMap: new THREE.Texture(),
       aoMap: new THREE.Texture(),
-      transparent: true,
+      // transparent: true,
       onBeforeCompile: (shader) => {
-        // console.log('on before compile', shader.fragmentShader);
-
+        // biomes uv index texture
         shader.uniforms.biomeUvDataTexture = {
           value: biomeUvDataTexture,
           needsUpdate: true,
         };
+        // texture atlas
         for (const mapName of mapNames) {
           shader.uniforms[mapName] = {
             value: atlasTextures[mapName],
             needsUpdate: true,
           };
         }
-        
+        // lighting
+        shader.uniforms.uSkylightTex = {
+          value: skylightTex,
+          needsUpdate: true,
+        };
+        shader.uniforms.uAoTex = {
+          value: aoTex,
+          needsUpdate: true,
+        };
+        shader.uniforms.uLightBasePosition = {
+          value: lightBasePosition,
+          needsUpdate: true,
+        };
+        shader.uniforms.uTerrainSize = {
+          value: terrainSize,
+          needsUpdate: true,
+        };
+
         // vertex shader
 
         shader.vertexShader = shader.vertexShader.replace(`#include <uv_pars_vertex>`, `\
@@ -247,14 +401,18 @@ class TerrainMesh extends BatchedMesh {
 
 attribute ivec4 biomes;
 attribute vec4 biomesWeights;
-// uniform sampler2D map;
+uniform vec3 uLightBasePosition;
+uniform float uTerrainSize;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
+varying vec3 vPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
+varying vec3 vUvLight;
         `);
         shader.vertexShader = shader.vertexShader.replace(`#include <worldpos_vertex>`, `\
 // #if defined( USE_ENVMAP ) || defined( DISTANCE ) || defined ( USE_SHADOWMAP ) || defined ( USE_TRANSMISSION )
+  vPosition = transformed;
   vec4 worldPosition = vec4( transformed, 1.0 );
   #ifdef USE_INSTANCING
     worldPosition = instanceMatrix * worldPosition;
@@ -262,10 +420,11 @@ varying vec3 vWorldNormal;
   worldPosition = modelMatrix * worldPosition;
 // #endif
 
-vWorldPosition = worldPosition.xyz;
+vWorldPosition = worldPosition.xyz; // XXX use local position instead of world position?
 vWorldNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
 vBiomes = biomes;
 vBiomesWeights = biomesWeights;
+vUvLight = (vWorldPosition - uLightBasePosition); // / uTerrainSize;
         `);
 
         // fragment shader
@@ -275,6 +434,8 @@ vBiomesWeights = biomesWeights;
   // uniform sampler2D map;
 #endif
 
+precision highp sampler3D;
+
 uniform sampler2D Base_Color;
 uniform sampler2D Emissive;
 uniform sampler2D Normal;
@@ -282,10 +443,16 @@ uniform sampler2D Roughness;
 uniform sampler2D Ambient_Occlusion;
 uniform sampler2D Height;
 uniform sampler2D biomeUvDataTexture;
+uniform sampler3D uSkylightTex;
+uniform sampler3D uAoTex;
+uniform vec3 uLightBasePosition;
+uniform float uTerrainSize;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
+varying vec3 vPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
+varying vec3 vUvLight;
 
 vec4 fourTapSample(
   sampler2D atlas,
@@ -505,6 +672,39 @@ float roughnessFactor = roughness;
   #endif
   diffuseColor *= sampledDiffuseColor;
 #endif
+
+// lighting
+{
+  const float numLightBands = 8.;
+
+  vec3 uvLight = (vPosition - uLightBasePosition) / uTerrainSize;
+  // uvLight.y += 2. / uTerrainSize;
+  // uvLight = 1. - uvLight.y;
+  // uvLight.y = 1. - uvLight.y;
+  vec4 skylightColor = texture(uSkylightTex, uvLight);
+  float skylightValue = skylightColor.r;
+  // skylightValue = floor(skylightValue * numLightBands) / numLightBands;
+  // diffuseColor.rgb = vec3(skylightValue);
+
+  vec4 aoColor = texture(uAoTex, uvLight);
+  float aoValue = aoColor.r * 255.;
+  
+  const float discount = 0.;
+  const float maxPossible = (27. - discount);
+  aoValue -= discount;
+  aoValue /= maxPossible;
+  aoValue = ceil(aoValue * numLightBands) / numLightBands;
+  diffuseColor.rgb = vec3(aoValue); // vec3(aoValue); // vec3(aoValue * 255. / 27.);
+
+  // diffuseColor.rgb += uvLight;
+  diffuseColor.a = 1.;
+  diffuseColor.rgb += uvLight * 0.05;
+  // vec4 aoColor = texture(uAoTex, uvLight);
+
+  if (uvLight.x <= 0. || uvLight.x >= uTerrainSize || uvLight.z <= 0. || uvLight.z >= uTerrainSize || uvLight.y <= 0. || uvLight.y >= uTerrainSize) {
+    diffuseColor.rgb = vec3(0.);
+  }
+}
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <aomap_fragment>`, `\
 #ifdef USE_AOMAP
@@ -527,12 +727,13 @@ float roughnessFactor = roughness;
     this.allocator = allocator;
     this.physicsObjects = [];
 
-    // window.terrainMesh = this;
+    this.skylightTex = skylightTex;
+    this.aoTex = aoTex;
   }
   async addChunk(chunk, {
     signal,
   }) {
-    const meshData = await dcWorkerManager.generateChunk(chunk, chunk.lodArray);
+    const meshData = await dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray);
     // console.log('mesh data', meshData);
     signal.throwIfAborted();
 
@@ -597,6 +798,59 @@ float roughnessFactor = roughness;
         });
       };
       _handleMesh();
+
+      const _handleLighting = () => {
+        const renderer = useRenderer();
+
+        const position = localVector.copy(chunk).clone()
+          .multiplyScalar(chunkWorldSize)
+          .sub(lightBasePosition);
+        // console.log('got position', position.x, position.y, position.z);
+        if (
+          position.x >= 0 && position.x < terrainSize &&
+          position.y >= 0 && position.y < terrainSize &&
+          position.z >= 0 && position.z < terrainSize
+        ) {
+          const sourceBox = localBox.set(
+            localVector2.set(0, 0, 0),
+            localVector3.set(chunkWorldSize - 1, chunkWorldSize - 1, chunkWorldSize - 1)
+          );
+          const level = 0;
+
+          {
+            /* console.log(
+              'copy texture',
+              position.toArray().join(','),
+              meshData.skylights.slice(),
+              meshData.skylights.filter(m => m > 0),
+              meshData.aos.filter(m => m > 0)
+            ); */
+
+            // console.log('copy texture', chunk.toArray().join(','), position.toArray().join(','));
+
+            const skylightSrcTex = new THREE.DataTexture3D(meshData.skylights, chunkWorldSize, chunkWorldSize, chunkWorldSize);
+            skylightSrcTex.format = THREE.RedFormat;
+            skylightSrcTex.type = THREE.UnsignedByteType;
+            skylightSrcTex.flipY = false;
+            skylightSrcTex.needsUpdate = true;
+          
+            renderer.copyTextureToTexture3D(sourceBox, position, skylightSrcTex, this.skylightTex, level);
+          }
+
+          {
+            const aoSrcTex = new THREE.DataTexture3D(meshData.aos, chunkWorldSize, chunkWorldSize, chunkWorldSize);
+            aoSrcTex.format = THREE.RedFormat;
+            aoSrcTex.type = THREE.UnsignedByteType;
+            aoSrcTex.flipY = false;
+            aoSrcTex.needsUpdate = true;
+                      
+            renderer.copyTextureToTexture3D(sourceBox, position, aoSrcTex, this.aoTex, level);
+          }
+        } else {
+          // chunk out of lighting range
+        }
+      };
+      _handleLighting();
 
       const _handlePhysics = async () => {
         this.matrixWorld.decompose(localVector, localQuaternion, localVector2);
@@ -750,6 +1004,7 @@ class TerrainChunkGenerator {
 
 export default (e) => {
   const app = useApp();
+  localApp = app;
   const physics = usePhysics();
   const {LodChunkTracker} = useLodder();
 
@@ -864,7 +1119,7 @@ export default (e) => {
     tracker && tracker.destroy();
   });
 
-  window.addAoMesh = async () => {
+  window.addAoMesh2 = async () => {
     const {WebaverseShaderMaterial} = useMaterials();
     const dcWorkerManager = useDcWorkerManager();
     const localPlayer = useLocalPlayer();
@@ -984,28 +1239,9 @@ export default (e) => {
     app.add(mesh);
     mesh.updateMatrixWorld();
   };
-  window.addSkylightMesh = async () => {
+  window.addSkylightMesh2 = async (skylightTex, p, size) => {
     const {WebaverseShaderMaterial} = useMaterials();
-    const dcWorkerManager = useDcWorkerManager();
-    const localPlayer = useLocalPlayer();
   
-    localMatrix.copy(localPlayer.matrixWorld)
-      .premultiply(
-        localMatrix2.copy(app.matrixWorld).invert()
-      )
-      .decompose(localVector, localQuaternion, localVector2);
-    localVector.x = Math.floor(localVector.x / chunkWorldSize) * chunkWorldSize;
-    localVector.y = Math.floor(localVector.y / chunkWorldSize) * chunkWorldSize;
-    localVector.z = Math.floor(localVector.z / chunkWorldSize) * chunkWorldSize;
-
-    const p = localVector.clone();
-    const size = chunkWorldSize;
-    const lod = 1;
-    const skylights = await dcWorkerManager.getSkylightFieldRange(
-      p.x, p.y, p.z,
-      size, size, size,
-      lod,
-    );
     // console.log('got skylights', skylights, size);
     // window.skylights = skylights;
     /* const aos2 = new Float32Array(aos.length);
@@ -1013,13 +1249,7 @@ export default (e) => {
       aos2[i] = aos[i] / 255;
     } */
     // console.log('got aos', aos, size);
-  
-    const skylightTex = new THREE.DataTexture3D(skylights, size, size, size);
-    skylightTex.format = THREE.RedFormat;
-    skylightTex.type = THREE.UnsignedByteType;
-    // skylightTex.type = THREE.FloatType;
-    skylightTex.needsUpdate = true;
-  
+
     /* setTimeout(() => {
       const renderer = useRenderer();
   
