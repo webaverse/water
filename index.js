@@ -325,6 +325,7 @@ class TerrainMesh extends BatchedMesh {
       // normalMapType: THREE.ObjectSpaceNormalMap,
       bumpMap: new THREE.Texture(),
       // bumpScale: 1,
+      // roughness: 1,
       roughnessMap: new THREE.Texture(),
       aoMap: new THREE.Texture(),
       // transparent: true,
@@ -653,22 +654,40 @@ float roughnessFactor = roughness;
   // uvLight.y += 2. / uTerrainSize;
   // uvLight = 1. - uvLight.y;
   // uvLight.y = 1. - uvLight.y;
-  vec4 skylightColor = texture(uSkylightTex, uvLight);
-  float skylightValue = skylightColor.r;
-  // skylightValue = floor(skylightValue * numLightBands) / numLightBands;
-  // diffuseColor.rgb = vec3(skylightValue);
+  float lightValue = 1.;
 
-  vec4 aoColor = texture(uAoTex, uvLight);
-  float aoValue = aoColor.r * 255.;
-  
-  const float discount = 0.;
-  const float maxPossible = (27. - discount);
-  const float baseAo = 0.3;
-  aoValue -= discount;
-  aoValue /= maxPossible;
-  aoValue = baseAo + aoValue * (1. - baseAo);
-  aoValue = ceil(aoValue * numLightBands) / numLightBands;
-  diffuseColor.rgb *= aoValue;
+  // skylight
+  {
+    vec4 skylightColor = texture(uSkylightTex, uvLight);
+    float skylightValue = skylightColor.r * 255.;
+
+    const float maxSkylight = 8.;
+    skylightValue /= maxSkylight;
+    // skylightValue *= 0.5;
+    // skylightValue = ceil(skylightValue * numLightBands) / numLightBands;
+
+    lightValue *= skylightValue;
+  }
+  // ao
+  {
+    vec4 aoColor = texture(uAoTex, uvLight);
+    float aoValue = aoColor.r * 255.;
+    
+    const float discount = 0.;
+    const float maxAo = (27. - discount);
+    const float baseAo = 0.5;
+    // const float baseAo = 0.;
+    aoValue -= discount;
+    aoValue /= maxAo;
+    aoValue = baseAo + aoValue * (1. - baseAo);
+    
+    lightValue *= aoValue;
+  }
+
+  // apply lighting
+  lightValue *= 1.2;
+  // lightValue = ceil(lightValue * numLightBands) / numLightBands;
+  diffuseColor.rgb *= lightValue;
 
   // diffuseColor.rgb += uvLight;
   // diffuseColor.rgb += uvLight * 0.05;
