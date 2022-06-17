@@ -162,7 +162,6 @@ const {BatchedMesh} = useInstancing();
 class TerrainMesh extends BatchedMesh {
   constructor({
     physics,
-    // biomeDataTexture,
     biomeUvDataTexture,
     atlasTextures,
   }) {
@@ -811,13 +810,11 @@ float roughnessFactor = roughness;
 class TerrainChunkGenerator {
   constructor({
     physics,
-    // biomeDataTexture,
     biomeUvDataTexture,
     atlasTextures,
   } = {}) {
     // parameters
     this.physics = physics;
-    // this.biomeDataTexture = biomeDataTexture;
     this.biomeUvDataTexture = biomeUvDataTexture;
     this.atlasTextures = atlasTextures;
 
@@ -827,7 +824,6 @@ class TerrainChunkGenerator {
 
     this.terrainMesh = new TerrainMesh({
       physics: this.physics,
-      // biomeDataTexture: this.biomeDataTexture,
       biomeUvDataTexture: this.biomeUvDataTexture,
       atlasTextures: this.atlasTextures,
     });
@@ -956,23 +952,6 @@ export default (e) => {
   let generator = null;
   let tracker = null;
   e.waitUntil((async () => {
-    /* const biomeDataTexture = (() => {
-      const data = new Uint8Array(256 * 4);
-      for (let i = 0; i < biomeSpecs.length; i++) {
-        const biomeSpec = biomeSpecs[i];
-        const [name, colorHex, textureName] = biomeSpec;
-        localColor.setHex(colorHex);
-        data[i * 4] = localColor.r * 255;
-        data[i * 4 + 1] = localColor.g * 255;
-        data[i * 4 + 2] = localColor.b * 255;
-        data[i * 4 + 3] = 255;
-      }
-      const texture = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat);
-      texture.minFilter = THREE.NearestFilter;
-      texture.magFilter = THREE.NearestFilter;
-      texture.needsUpdate = true;
-      return texture;
-    })(); */
     // this small texture maps biome indexes in the geometry to biome uvs in the atlas texture
     const biomeUvDataTexture = (() => {
       const data = new Uint8Array(256 * 4);
@@ -993,7 +972,6 @@ export default (e) => {
         data[i * 4 + 2] = 0;
         data[i * 4 + 3] = 255;
       }
-      // console.log('got uv data texture', data);
       const texture = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat);
       texture.minFilter = THREE.NearestFilter;
       texture.magFilter = THREE.NearestFilter;
@@ -1023,7 +1001,6 @@ export default (e) => {
 
     generator = new TerrainChunkGenerator({
       physics,
-      // biomeDataTexture,
       biomeUvDataTexture,
       atlasTextures,
     });
