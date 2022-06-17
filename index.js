@@ -35,34 +35,6 @@ let localApp = null;
 const addSkylightMesh = async (skylightTex, p, size) => {
   const {WebaverseShaderMaterial} = useMaterials();  
   const app = localApp;
-  // console.log('got skylights', skylights, size);
-  // window.skylights = skylights;
-  /* const aos2 = new Float32Array(aos.length);
-  for (let i = 0; i < aos.length; i++) {
-    aos2[i] = aos[i] / 255;
-  } */
-  // console.log('got aos', aos, size);
-
-  /* setTimeout(() => {
-    const renderer = useRenderer();
-
-    const position = new THREE.Vector3(6, 6, 6);
-    const sourceBox = new THREE.Box3(
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(3, 3, 3)
-    );
-    const w = sourceBox.max.x - sourceBox.min.x;
-    const h = sourceBox.max.y - sourceBox.min.y;
-    const d = sourceBox.max.z - sourceBox.min.z;
-    const damageTex = new THREE.DataTexture3D(
-      new Uint8Array(w * h * d).fill(128),
-      w, h, d
-    );
-    damageTex.format = THREE.RedFormat;
-    damageTex.type = THREE.UnsignedByteType;
-    const level = 0;
-    renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level);
-  }, 1000); */
 
   const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
     .scale(0.9, 0.9, 0.9);
