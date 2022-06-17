@@ -249,35 +249,9 @@ class TerrainMesh extends BatchedMesh {
       aoMap: new THREE.Texture(),
       // transparent: true,
       onBeforeCompile: (shader) => {
-        // biomes uv index texture
-        shader.uniforms.biomeUvDataTexture = {
-          value: biomeUvDataTexture,
-          needsUpdate: true,
-        };
-        // texture atlas
-        for (const mapName of mapNames) {
-          shader.uniforms[mapName] = {
-            value: atlasTextures[mapName],
-            needsUpdate: true,
-          };
+        for (const k in material.uniforms) {
+          shader.uniforms[k] = material.uniforms[k];
         }
-        // lighting
-        shader.uniforms.uSkylightTex = {
-          value: skylightTex,
-          needsUpdate: true,
-        };
-        shader.uniforms.uAoTex = {
-          value: aoTex,
-          needsUpdate: true,
-        };
-        shader.uniforms.uLightBasePosition = {
-          value: this.lightBasePosition.clone(),
-          needsUpdate: true,
-        };
-        shader.uniforms.uTerrainSize = {
-          value: terrainSize,
-          needsUpdate: true,
-        };
 
         // vertex shader
 
@@ -631,6 +605,46 @@ float roughnessFactor = roughness;
         return shader;
       },
     });
+    const lightBasePosition = new THREE.Vector3(
+      -terrainSize/2,
+      terrainSize,
+      -terrainSize/2
+    );
+    material.uniforms = (() => {
+      const uniforms = {};
+      
+      // biomes uv index texture
+      uniforms.biomeUvDataTexture = {
+        value: biomeUvDataTexture,
+        needsUpdate: true,
+      };
+      // texture atlas
+      for (const mapName of mapNames) {
+        uniforms[mapName] = {
+          value: atlasTextures[mapName],
+          needsUpdate: true,
+        };
+      }
+      // lighting
+      uniforms.uSkylightTex = {
+        value: skylightTex,
+        needsUpdate: true,
+      };
+      uniforms.uAoTex = {
+        value: aoTex,
+        needsUpdate: true,
+      };
+      uniforms.uLightBasePosition = {
+        value: lightBasePosition.clone(),
+        needsUpdate: true,
+      };
+      uniforms.uTerrainSize = {
+        value: terrainSize,
+        needsUpdate: true,
+      };
+
+      return uniforms;
+    })();
     super(geometry, material, allocator);
     this.frustumCulled = false;
 
@@ -641,11 +655,7 @@ float roughnessFactor = roughness;
     this.skylightTex = skylightTex;
     this.aoTex = aoTex;
 
-    this.lightBasePosition = new THREE.Vector3(
-      -terrainSize/2,
-      terrainSize,
-      -terrainSize/2
-    );
+    // this.lightBasePosition = lightBasePosition;
   }
   async addChunk(chunk, {
     signal,
@@ -722,7 +732,7 @@ float roughnessFactor = roughness;
 
         const position = localVector.copy(chunk).clone()
           .multiplyScalar(chunkWorldSize)
-          .sub(this.lightBasePosition);
+          .sub(this.material.uniforms.uLightBasePosition.value);
         // console.log('got position', position.x, position.y, position.z);
         if (
           position.x >= 0 && position.x < terrainSize &&
@@ -786,18 +796,15 @@ float roughnessFactor = roughness;
     }
   }
   updateCoord(coord, min2xCoord) {
-    const lastPosition = this.lightBasePosition.clone();
+    const lastPosition = this.material.uniforms.uLightBasePosition.value.clone();
     const newPosition = min2xCoord.clone().multiplyScalar(chunkWorldSize);
     const delta = newPosition.clone()
       .sub(lastPosition);
     
-    console.log('got', delta.toArray().join(','));
+    this.material.uniforms.uLightBasePosition.value.copy(newPosition);
+    this.material.uniforms.uLightBasePosition.needsUpdate = true;
 
-    /* const oldHeightfieldPosition = localVector2D.copy(material.uniforms.uHeightfieldMinPosition.value).clone();
-    const newHeightfieldPosition = localVector2D2.set(min2xCoord.x, min2xCoord.z).clone()
-      .multiplyScalar(chunkWorldSize);
-    const delta = localVector2D3.copy(newHeightfieldPosition).clone()
-      .sub(oldHeightfieldPosition); */
+    // XXX copy the displaced texture to its new position
   }
 }
 
