@@ -331,7 +331,7 @@ class TerrainMesh extends BatchedMesh {
     skylightTex.needsUpdate = true;
     skylightTex.generateMipmaps = false;
 
-    addSkylightMesh(skylightTex, lightBasePosition, terrainSize);
+    // addSkylightMesh(skylightTex, lightBasePosition, terrainSize);
 
     const aoData = new Uint8Array(terrainSize * terrainSize * terrainSize)//.fill(1);
     const aoTex = new THREE.DataTexture3D(aoData, terrainSize, terrainSize, terrainSize);
