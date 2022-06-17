@@ -31,79 +31,6 @@ const lightBasePosition = new THREE.Vector3(
   -terrainSize/2
 );
 
-/* let localApp = null;
-const addSkylightMesh = async (skylightTex, p, size) => {
-  const {WebaverseShaderMaterial} = useMaterials();  
-  const app = localApp;
-
-  const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
-    .scale(0.9, 0.9, 0.9);
-  const geometry = new THREE.InstancedBufferGeometry()
-    .copy(boxGeometry);
-  const material = new WebaverseShaderMaterial({
-    uniforms: {
-      uSkylightTex: {
-        value: skylightTex,
-        needsUpdate: true,
-      }
-    },
-    vertexShader: `\
-      flat varying vec3 vUv;
-      varying vec3 vNormal;
-
-      const float size = ${size.toFixed(8)};
-
-      void main() {
-        // vUv = position / size;
-
-        float instanceId = float(gl_InstanceID);
-        float x = mod(instanceId, size);
-        instanceId -= x;
-        instanceId /= size;
-        float y = mod(instanceId, size);
-        instanceId -= y;
-        instanceId /= size;
-        float z = instanceId;
-
-        vec3 p = vec3(x, y, z);
-        vUv = (p + 0.5) / size;
-        vNormal = normal;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position + p, 1.0);
-      }
-    `,
-    fragmentShader: `\
-      precision highp float;
-      precision highp int;
-      precision highp sampler3D;
-
-      uniform sampler3D uSkylightTex;
-      flat varying vec3 vUv;
-      varying vec3 vNormal;
-
-      const float size = ${size.toFixed(8)};
-
-      void main() {
-        vec4 sampleColor = texture(uSkylightTex, vUv);
-        if (sampleColor.r > 0.) {        
-          gl_FragColor = vec4(vUv, sampleColor.r);
-          // gl_FragColor.a = 1.;
-        } else {
-          discard;
-        }
-      }
-    `,
-    transparent: true,
-    // depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const count = size * size * size;
-  const mesh = new THREE.InstancedMesh(geometry, material, count);
-  mesh.position.copy(p);
-  mesh.frustumCulled = false;
-  app.add(mesh);
-  mesh.updateMatrixWorld();
-}; */
-
 // const textureLoader = new THREE.TextureLoader();
 const abortError = new Error('chunk disposed');
 const fakeMaterial = new THREE.MeshBasicMaterial({
@@ -1001,7 +928,6 @@ class TerrainChunkGenerator {
 
 export default (e) => {
   const app = useApp();
-  // localApp = app;
   const physics = usePhysics();
   const {LodChunkTracker} = useLodder();
 
