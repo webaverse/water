@@ -25,12 +25,6 @@ const chunkRadius = Math.sqrt(chunkWorldSize * chunkWorldSize * 3);
 const numLods = 1;
 const bufferSize = 20 * 1024 * 1024;
 
-const lightBasePosition = new THREE.Vector3(
-  -terrainSize/2,
-  terrainSize,
-  -terrainSize/2
-);
-
 // const textureLoader = new THREE.TextureLoader();
 const abortError = new Error('chunk disposed');
 const fakeMaterial = new THREE.MeshBasicMaterial({
@@ -277,7 +271,7 @@ class TerrainMesh extends BatchedMesh {
           needsUpdate: true,
         };
         shader.uniforms.uLightBasePosition = {
-          value: lightBasePosition,
+          value: this.lightBasePosition.clone(),
           needsUpdate: true,
         };
         shader.uniforms.uTerrainSize = {
@@ -646,6 +640,12 @@ float roughnessFactor = roughness;
 
     this.skylightTex = skylightTex;
     this.aoTex = aoTex;
+
+    this.lightBasePosition = new THREE.Vector3(
+      -terrainSize/2,
+      terrainSize,
+      -terrainSize/2
+    );
   }
   async addChunk(chunk, {
     signal,
@@ -722,7 +722,7 @@ float roughnessFactor = roughness;
 
         const position = localVector.copy(chunk).clone()
           .multiplyScalar(chunkWorldSize)
-          .sub(lightBasePosition);
+          .sub(this.lightBasePosition);
         // console.log('got position', position.x, position.y, position.z);
         if (
           position.x >= 0 && position.x < terrainSize &&
