@@ -1087,6 +1087,7 @@ export default (e) => {
       numLods,
       chunkHeight: chunkWorldSize,
     });
+    tracker.addEventListener('coordupdate', coordupdate);
 
     app.add(generator.object);
     generator.object.updateMatrixWorld();
@@ -1098,6 +1099,11 @@ export default (e) => {
   app.addEventListener('hit', e => {
     generator && tracker && generator.hit(e, tracker);
   });
+
+  const coordupdate = e => {
+    const {coord, min2xCoord} = e.data;
+    generator.updateCoord(coord, min2xCoord);
+  };
 
   useFrame(() => {
     if (tracker) {
@@ -1113,7 +1119,10 @@ export default (e) => {
 
   useCleanup(() => {
     live = false;
-    tracker && tracker.destroy();
+    if (tracker) {
+      tracker.destroy();
+      tracker.removeEventListener('coordupdate', coordupdate);
+    }
   });
 
   window.addAoMesh2 = async () => {
