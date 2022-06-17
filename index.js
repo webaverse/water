@@ -726,33 +726,34 @@ float roughnessFactor = roughness;
   async addChunk(chunk, {
     signal,
   }) {
-    const meshData = await dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray);
-    // console.log('mesh data', meshData);
-    signal.throwIfAborted();
-
-    const _handlePhysics = async () => {
-      if (meshData) {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(meshData.positions, 3));
-        geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
-        const physicsMesh = new THREE.Mesh(geometry, fakeMaterial);
-    
-        const geometryBuffer = await this.physics.cookGeometryAsync(physicsMesh, {
-          signal,
-        });
-        // XXX should clean up if we bail out
-        signal.throwIfAborted();
-
-        return geometryBuffer;
-      } else {
-        return null;
-      }
-    };
-    const geometryBuffer = await _handlePhysics();
-
-    this.bindChunk(chunk, meshData, geometryBuffer, signal);
+    const meshData = await dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray, {
+      signal,
+    });
+    const geometryBuffer = await this.getChunkGeometryBufferAsync(meshData, {
+      signal,
+    });
+    this.drawChunk(chunk, meshData, geometryBuffer, signal);
   }
-  bindChunk(chunk, meshData, geometryBuffer, signal) {
+  async getChunkGeometryBufferAsync(meshData, {
+    signal,
+  }) {
+    if (meshData) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(meshData.positions, 3));
+      geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
+      const physicsMesh = new THREE.Mesh(geometry, fakeMaterial);
+  
+      const geometryBuffer = await this.physics.cookGeometryAsync(physicsMesh, {
+        signal,
+      });
+      // XXX should clean up if we bail out
+
+      return geometryBuffer;
+    } else {
+      return null;
+    }
+  }
+  drawChunk(chunk, meshData, geometryBuffer, signal) {
     if (meshData) { // non-empty chunk
       const _mapOffsettedIndices = (srcIndices, dstIndices, dstOffset, positionOffset) => {
         const positionIndex = positionOffset / 3;
@@ -895,9 +896,9 @@ class TerrainChunkGenerator {
     // console.log('get physics object', this.terrainMesh.physicsObjects);
     return this.terrainMesh.physicsObjects;
   }
+
   generateChunk(chunk) {
-    const abortController = new AbortController();
-    const {signal} = abortController;
+    const signal = this.bindChunk(chunk);
 
     this.terrainMesh.addChunk(chunk, {
       signal,
@@ -906,13 +907,7 @@ class TerrainChunkGenerator {
         console.warn(err);
       }
     });
-
-    chunk.binding = {
-      abortController,
-      // signal,
-    }
   }
-
   disposeChunk(chunk) {
     const binding = chunk.binding;
     if (binding) {
@@ -923,26 +918,28 @@ class TerrainChunkGenerator {
     }
   }
 
-  /* getMeshAtWorldPosition(p) {
-    return null; // XXX will be done with intersection
-    localVector.copy(p).divideScalar(chunkWorldSize);
-    const mesh =
-      this.object.children.find(
-        (m) => !!m.chunk && m.chunk.equals(localVector)
-      ) || null;
-    return mesh;
-  } */
+  bindChunk(chunk) {
+    const abortController = new AbortController();
+    const {signal} = abortController;
+
+    chunk.binding = {
+      abortController,
+      // signal,
+    };
+
+    return signal;
+  }
 
   async hit(e, tracker) {
     const {LodChunk} = useLodder();
 
+    // perform damage
     const hitPosition = localVector.copy(e.hitPosition)
       .applyMatrix4(localMatrix.copy(this.terrainMesh.matrixWorld).invert());
-    // console.log('hit 1', hitPosition.toArray().join(','));
     const chunks = await dcWorkerManager.drawSphereDamage(hitPosition, 3);
-    // console.log('hit 2', chunks);
     if (chunks) {
-      const meshDatas = await Promise.all(chunks.map(async chunkSpec => {
+      // generate the new chunks
+      let meshSpecs = await Promise.all(chunks.map(async chunkSpec => {
         const lodArray = Array(8).fill(1);
         const chunk = new LodChunk(
           chunkSpec.position[0],
@@ -951,34 +948,42 @@ class TerrainChunkGenerator {
           lodArray
         )
           .divideScalar(chunkWorldSize);
-        // console.log('regenerate', chunk, chunk.lodArray);
-        const meshData = await dcWorkerManager.generateChunk(chunk, chunk.lodArray);
-        return meshData ? {
-          chunk,
-          meshData,
-        } : null;
+        const signal = this.bindChunk(chunk);
+        const meshData = await dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray, {
+          signal,
+        });
+        if (meshData) {
+          const geometryBuffer = await this.terrainMesh.getChunkGeometryBufferAsync(meshData, {
+            signal,
+          });
+          return {
+            chunk,
+            meshData,
+            geometryBuffer,
+            signal,
+          };
+        } else {
+          return null;
+        }
       }));
-      const oldChunks = meshDatas.map(meshData => {
-        return meshData ?? tracker.chunks.find(chunk => chunk.equals(meshData.chunk)) ?? null;
-      }).filter(e => e !== null);
-      // console.log('got mesh datas', meshDatas, tracker.chunks, oldChunks);
-      // console.log('hit 2', hitPosition.toArray().join(','), result);
-      /* const oldMeshes = neededChunkMins.map((v) => {
-        return this.getMeshAtWorldPosition(v);
+      meshSpecs = meshSpecs.filter(m => m !== null);
+      // remove old chunks
+      tracker.chunks = tracker.chunks.filter(chunk => {
+        if (!meshSpecs.some(meshSpec => {
+          return meshSpec.chunk.equals(chunk);
+        })) { // not being replaced
+          return true;
+        } else { // being replaced
+          this.disposeChunk(chunk);
+          return false;
+        }
       });
-      const oldChunks = oldMeshes.filter(mesh => mesh !== null).map(mesh => mesh.chunk);
-      for (const oldChunk of oldChunks) {
-        this.disposeChunk(oldChunk);
+      // add new chunks
+      for (const meshSpec of meshSpecs) {
+        const {chunk, meshData, geometryBuffer, signal} = meshSpec;
+        this.terrainMesh.drawChunk(chunk, meshData, geometryBuffer, signal);
+        tracker.chunks.push(chunk);
       }
-
-      setTimeout(async () => {
-        await Promise.all(neededChunkMins.map(async minVector => {
-          const chunkPosition = localVector.copy(minVector).divideScalar(chunkWorldSize).clone();
-          const chunk = await this.generateChunk(chunkPosition);
-          return chunk;
-        }));
-        // console.log('got hit result', result, chunks, this.object.children.map(m => m.chunk.toArray().join(',')));
-      }, 1000); */
     } else {
       console.log('no update');
     }
