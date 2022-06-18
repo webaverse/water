@@ -18,6 +18,8 @@ const localMatrix2 = new THREE.Matrix4();
 const localSphere = new THREE.Sphere();
 const localBox = new THREE.Box3();
 
+const zeroVector = new THREE.Vector3();
+
 const dcWorkerManager = useDcWorkerManager();
 const chunkWorldSize = dcWorkerManager.chunkSize;
 const terrainSize = chunkWorldSize * 4;
@@ -92,16 +94,35 @@ const _writeTex3d = (dstTex, dstSize, dstPosition, srcArray, sourceBox) => {
   const renderer = useRenderer();
 
   _copyArray3d(dstTex.image.data, dstSize, dstPosition, srcArray, sourceBox);
+
   const w = sourceBox.max.x - sourceBox.min.x + 1;
   const h = sourceBox.max.y - sourceBox.min.y + 1;
   const d = sourceBox.max.z - sourceBox.min.z + 1;
-
-  const level = 0;
 
   const destinationBox = localBox.set(
     dstPosition,
     localVector.set(dstPosition.x + w - 1, dstPosition.y + h - 1, dstPosition.z + d - 1),
   );
+
+  const level = 0;
+
+  renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
+};
+const _writeTex3dWithin = (dstTex, dstPosition, sourceBox) => {
+  const renderer = useRenderer();
+
+  _copyArray3dWithin(dstTex.image.data, dstPosition, sourceBox);
+  
+  const w = sourceBox.max.x - sourceBox.min.x + 1;
+  const h = sourceBox.max.y - sourceBox.min.y + 1;
+  const d = sourceBox.max.z - sourceBox.min.z + 1;
+
+  const destinationBox = localBox.set(
+    dstPosition,
+    localVector.set(dstPosition.x + w - 1, dstPosition.y + h - 1, dstPosition.z + d - 1),
+  );
+
+  const level = 0;
 
   renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
 };
@@ -853,8 +874,8 @@ float roughnessFactor = roughness;
     this.material.uniforms.uLightBasePosition.needsUpdate = true;
 
     // XXX copy the displaced texture to its new position
-    {
-      const renderer = useRenderer();
+    if (!deltaNegative.equals(zeroVector)) {
+      // const renderer = useRenderer();
   
       const position = deltaNegative.clone();
       const sourceBox = new THREE.Box3(
@@ -886,6 +907,9 @@ float roughnessFactor = roughness;
       if (position.z + sourceBox.max.z >= terrainSize) {
         sourceBox.max.z = terrainSize - position.z;
       }
+
+      _writeTex3dWithin(this.skylightTex, position, sourceBox);
+      _writeTex3dWithin(this.aoTex, position, sourceBox);
 
       /* const w = sourceBox.max.x - sourceBox.min.x;
       const h = sourceBox.max.y - sourceBox.min.y;
