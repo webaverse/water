@@ -35,6 +35,13 @@ const fakeMaterial = new THREE.MeshBasicMaterial({
 });
 const lightTexSize = new THREE.Vector3(terrainSize, terrainSize, terrainSize);
 
+class ChunkRenderData {
+  constructor(meshData, geometryBuffer) {
+    this.meshData = meshData;
+    this.geometryBuffer = geometryBuffer;
+  }
+}
+
 const _copyArray3d = (dstArray, dstSize, dstPosition, srcArray, sourceBox) => {
   const sw = sourceBox.max.x - sourceBox.min.x + 1;
   const sh = sourceBox.max.y - sourceBox.min.y + 1;
@@ -764,17 +771,13 @@ float roughnessFactor = roughness;
   async addChunk(chunk, {
     signal,
   }) {
+    const renderData = await this.getChunkRenderData(chunk, signal);
+    this.drawChunk(chunk, renderData, signal);
+  }
+  async getChunkRenderData(chunk, signal) {
     const meshData = await dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray, {
       signal,
     });
-    const geometryBuffer = await this.getChunkGeometryBufferAsync(meshData, {
-      signal,
-    });
-    this.drawChunk(chunk, meshData, geometryBuffer, signal);
-  }
-  async getChunkGeometryBufferAsync(meshData, {
-    signal,
-  }) {
     if (meshData) {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(meshData.positions, 3));
@@ -784,15 +787,18 @@ float roughnessFactor = roughness;
       const geometryBuffer = await this.physics.cookGeometryAsync(physicsMesh, {
         signal,
       });
-      // XXX should clean up if we bail out
-
-      return geometryBuffer;
+      return new ChunkRenderData(meshData, geometryBuffer);
     } else {
       return null;
     }
   }
-  drawChunk(chunk, meshData, geometryBuffer, signal) {
-    if (meshData) { // non-empty chunk
+  drawChunk(chunk, renderData, signal) {
+    if (renderData) { // non-empty chunk
+      const {
+        meshData,
+        geometryBuffer,
+      } = renderData;
+
       const _mapOffsettedIndices = (srcIndices, dstIndices, dstOffset, positionOffset) => {
         const positionIndex = positionOffset / 3;
         for (let i = 0; i < srcIndices.length; i++) {
@@ -951,13 +957,17 @@ class TerrainChunkGenerator {
   generateChunk(chunk) {
     const signal = this.bindChunk(chunk);
 
-    this.terrainMesh.addChunk(chunk, {
-      signal,
-    }).catch(err => {
-      if (err !== abortError) {
-        console.warn(err);
+    (async () => {
+      try {
+        await this.terrainMesh.addChunk(chunk, {
+          signal,
+        });
+      } catch (err) {
+        if (err !== abortError) {
+          console.warn(err);
+        }
       }
-    });
+    })();
   }
   disposeChunk(chunk) {
     const binding = chunk.binding;
@@ -967,6 +977,38 @@ class TerrainChunkGenerator {
 
       chunk.binding = null;
     }
+  }
+  relodChunk(oldChunk, newChunk) {
+    // console.log('relod chunk', oldChunk, newChunk);
+    
+    (async () => {
+      try {
+        const oldAbortController = oldChunk.binding.abortController;
+        // const oldSignal = oldAbortController.signal;
+        const newSignal = this.bindChunk(newChunk);
+        // const newAbortController = newChunk.binding.abortController;
+
+        const abortOldChunk = e => {
+          oldAbortController.abort(abortError);
+        };
+        newSignal.addEventListener('abort', abortOldChunk);
+
+        const renderData = await this.terrainMesh.getChunkRenderData(newChunk, newSignal);
+        
+        newSignal.removeEventListener('abort', abortOldChunk);
+
+        this.disposeChunk(oldChunk);
+        this.terrainMesh.drawChunk(newChunk, renderData, newSignal);
+
+        // newChunk.binding = oldChunk.binding;
+        // oldChunk.binding = null;
+        // XXX
+      } catch (err) {
+        if (err !== abortError) {
+          console.warn(err);
+        }
+      }
+    })();
   }
 
   bindChunk(chunk) {
