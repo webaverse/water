@@ -32,21 +32,46 @@ const fakeMaterial = new THREE.MeshBasicMaterial({
 });
 const lightTexSize = new THREE.Vector3(terrainSize, terrainSize, terrainSize);
 
-const _writeTex3d = (dstTex, size, srcArray, position, sourceBox) => {
+const _copyArray3d = (dstArray, dstSize, dstPosition, srcArray, sourceBox) => {
+  const sw = sourceBox.max.x - sourceBox.min.x + 1;
+  const sh = sourceBox.max.y - sourceBox.min.y + 1;
+  const sd = sourceBox.max.z - sourceBox.min.z + 1;
+  
+  for (let z = 0; z < sd; z++) {
+    const sz = z + sourceBox.min.z;
+    const dz = dstPosition.z + z;
+    for (let y = 0; y < sh; y++) {
+      const sy = y + sourceBox.min.y;
+      const dy = dstPosition.y + y;
+      let srcIndex = sourceBox.min.x + sy * sw + sz * sw * sh;
+      let dstIndex = dstPosition.x + dy * dstSize.x + dz * dstSize.x * dstSize.y;
+      for (let x = 0; x < sw; x++) {
+        dstArray[dstIndex++] = srcArray[srcIndex++];
+      }
+    }
+  }
+};
+const _writeTex3d = (dstTex, dstSize, dstPosition, srcArray, sourceBox) => {
   const renderer = useRenderer();
 
+  _copyArray3d(dstTex.image.data, dstSize, dstPosition, srcArray, sourceBox);
   const w = sourceBox.max.x - sourceBox.min.x + 1;
   const h = sourceBox.max.y - sourceBox.min.y + 1;
   const d = sourceBox.max.z - sourceBox.min.z + 1;
-  const srcTex = new THREE.DataTexture3D(srcArray, w, h, d);
+  /* const srcTex = new THREE.DataTexture3D(srcArray, w, h, d);
   srcTex.format = THREE.RedFormat;
   srcTex.type = THREE.UnsignedByteType;
   srcTex.flipY = false;
-  srcTex.needsUpdate = true;
+  srcTex.needsUpdate = true; */
 
   const level = 0;
 
-  renderer.copyTextureToTexture3D(sourceBox, position, srcTex, dstTex, level);
+  const destinationBox = localBox.set(
+    dstPosition,
+    localVector.set(dstPosition.x + w - 1, dstPosition.y + h - 1, dstPosition.z + d - 1),
+  );
+
+  renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
 };
 
 const mapNames = [
@@ -759,11 +784,11 @@ float roughnessFactor = roughness;
           const sourceBox = localBox.set(
             localVector2.set(0, 0, 0),
             localVector3.set(chunkWorldSize - 1, chunkWorldSize - 1, chunkWorldSize - 1)
-          );
-          const level = 0;
+          ).clone();
+          // const level = 0;
 
-          _writeTex3d(this.skylightTex, lightTexSize, meshData.skylights, position, sourceBox);
-          _writeTex3d(this.aoTex, lightTexSize, meshData.aos, position, sourceBox);
+          _writeTex3d(this.skylightTex, lightTexSize, position, meshData.skylights, sourceBox);
+          _writeTex3d(this.aoTex, lightTexSize, position, meshData.aos, sourceBox);
         } else {
           // chunk out of lighting range
         }
