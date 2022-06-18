@@ -82,10 +82,12 @@ const _copyArray3dWithin = (array, dstSize, dstPosition, sourceBox) => {
     for (let y = startY; y !== endY; y += deltaY) {
       const sy = y + sourceBox.min.y;
       const dy = dstPosition.y + y;
-      for (let x = startX; x !== endX; x += deltaX) {
-        const srcIndex = x + sourceBox.min.x + sy * dstSize.x + sz * dstSize.x * dstSize.y;
-        const dstIndex = x + dstPosition.x + dy * dstSize.x + dz * dstSize.x * dstSize.y;
+      let srcIndex = startX + sourceBox.min.x + sy * dstSize.x + sz * dstSize.x * dstSize.y;
+      let dstIndex = startX + dstPosition.x + dy * dstSize.x + dz * dstSize.x * dstSize.y;
+      for (let x = 0; x < sw; x++) {
         array[dstIndex] = array[srcIndex];
+        dstIndex += deltaX;
+        srcIndex += deltaX;
       }
     }
   }
