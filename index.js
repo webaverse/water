@@ -30,6 +30,24 @@ const abortError = new Error('chunk disposed');
 const fakeMaterial = new THREE.MeshBasicMaterial({
   color: 0xffffff,
 });
+const lightTexSize = new THREE.Vector3(terrainSize, terrainSize, terrainSize);
+
+const _writeTex3d = (dstTex, size, srcArray, position, sourceBox) => {
+  const renderer = useRenderer();
+
+  const w = sourceBox.max.x - sourceBox.min.x + 1;
+  const h = sourceBox.max.y - sourceBox.min.y + 1;
+  const d = sourceBox.max.z - sourceBox.min.z + 1;
+  const srcTex = new THREE.DataTexture3D(srcArray, w, h, d);
+  srcTex.format = THREE.RedFormat;
+  srcTex.type = THREE.UnsignedByteType;
+  srcTex.flipY = false;
+  srcTex.needsUpdate = true;
+
+  const level = 0;
+
+  renderer.copyTextureToTexture3D(sourceBox, position, srcTex, dstTex, level);
+};
 
 const mapNames = [
   'Base_Color',
@@ -211,8 +229,8 @@ class TerrainMesh extends BatchedMesh {
     )
     grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping */
 
-    const skylightData = new Uint8Array(terrainSize * terrainSize * terrainSize)//.fill(1);
-    const skylightTex = new THREE.DataTexture3D(skylightData, terrainSize, terrainSize, terrainSize);
+    const skylightData = new Uint8Array(lightTexSize.x * lightTexSize.y * lightTexSize.z)//.fill(1);
+    const skylightTex = new THREE.DataTexture3D(skylightData, lightTexSize.x, lightTexSize.y, lightTexSize.z);
     skylightTex.format = THREE.RedFormat;
     skylightTex.type = THREE.UnsignedByteType;
     skylightTex.minFilter = THREE.LinearFilter;
@@ -223,8 +241,8 @@ class TerrainMesh extends BatchedMesh {
     skylightTex.needsUpdate = true;
     skylightTex.generateMipmaps = false;
 
-    const aoData = new Uint8Array(terrainSize * terrainSize * terrainSize)//.fill(1);
-    const aoTex = new THREE.DataTexture3D(aoData, terrainSize, terrainSize, terrainSize);
+    const aoData = new Uint8Array(lightTexSize.x * lightTexSize.y * lightTexSize.z)//.fill(1);
+    const aoTex = new THREE.DataTexture3D(aoData, lightTexSize.x, lightTexSize.y, lightTexSize.z);
     aoTex.format = THREE.RedFormat;
     aoTex.type = THREE.UnsignedByteType;
     aoTex.minFilter = THREE.LinearFilter;
@@ -744,25 +762,8 @@ float roughnessFactor = roughness;
           );
           const level = 0;
 
-          {
-            const skylightSrcTex = new THREE.DataTexture3D(meshData.skylights, chunkWorldSize, chunkWorldSize, chunkWorldSize);
-            skylightSrcTex.format = THREE.RedFormat;
-            skylightSrcTex.type = THREE.UnsignedByteType;
-            skylightSrcTex.flipY = false;
-            skylightSrcTex.needsUpdate = true;
-          
-            renderer.copyTextureToTexture3D(sourceBox, position, skylightSrcTex, this.skylightTex, level);
-          }
-
-          {
-            const aoSrcTex = new THREE.DataTexture3D(meshData.aos, chunkWorldSize, chunkWorldSize, chunkWorldSize);
-            aoSrcTex.format = THREE.RedFormat;
-            aoSrcTex.type = THREE.UnsignedByteType;
-            aoSrcTex.flipY = false;
-            aoSrcTex.needsUpdate = true;
-                      
-            renderer.copyTextureToTexture3D(sourceBox, position, aoSrcTex, this.aoTex, level);
-          }
+          _writeTex3d(this.skylightTex, lightTexSize, meshData.skylights, position, sourceBox);
+          _writeTex3d(this.aoTex, lightTexSize, meshData.aos, position, sourceBox);
         } else {
           // chunk out of lighting range
         }
@@ -789,11 +790,58 @@ float roughnessFactor = roughness;
     const newPosition = min2xCoord.clone().multiplyScalar(chunkWorldSize);
     const delta = newPosition.clone()
       .sub(lastPosition);
+    const deltaNegative = delta.clone().negate();
     
     this.material.uniforms.uLightBasePosition.value.copy(newPosition);
     this.material.uniforms.uLightBasePosition.needsUpdate = true;
 
     // XXX copy the displaced texture to its new position
+    {
+      const renderer = useRenderer();
+  
+      const position = deltaNegative.clone();
+      const sourceBox = new THREE.Box3(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(terrainSize, terrainSize, terrainSize)
+      );
+
+      // clip min
+      if (position.x < 0) {
+        sourceBox.min.x -= position.x;
+        position.x = 0;
+      }
+      if (position.y < 0) {
+        sourceBox.min.y -= position.y;
+        position.y = 0;
+      }
+      if (position.z < 0) {
+        sourceBox.min.z -= position.z;
+        position.z = 0;
+      }
+
+      // clip max
+      if (position.x + sourceBox.max.x >= terrainSize) {
+        sourceBox.max.x = terrainSize - position.x;
+      }
+      if (position.y + sourceBox.max.y >= terrainSize) {
+        sourceBox.max.y = terrainSize - position.y;
+      }
+      if (position.z + sourceBox.max.z >= terrainSize) {
+        sourceBox.max.z = terrainSize - position.z;
+      }
+
+      /* const w = sourceBox.max.x - sourceBox.min.x;
+      const h = sourceBox.max.y - sourceBox.min.y;
+      const d = sourceBox.max.z - sourceBox.min.z;
+      const damageTex = new THREE.DataTexture3D(
+        new Uint8Array(w * h * d).fill(128),
+        w, h, d
+      );
+      damageTex.format = THREE.RedFormat;
+      damageTex.type = THREE.UnsignedByteType;
+      const level = 0;
+      renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level); */
+    }
   }
 }
 
