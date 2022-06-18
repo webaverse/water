@@ -882,7 +882,7 @@ float roughnessFactor = roughness;
       const position = deltaNegative.clone();
       const sourceBox = new THREE.Box3(
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(terrainSize, terrainSize, terrainSize)
+        new THREE.Vector3(terrainSize - 1, terrainSize - 1, terrainSize - 1)
       );
 
       // clip min
