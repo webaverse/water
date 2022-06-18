@@ -875,10 +875,7 @@ float roughnessFactor = roughness;
     this.material.uniforms.uLightBasePosition.value.copy(newPosition);
     this.material.uniforms.uLightBasePosition.needsUpdate = true;
 
-    // XXX copy the displaced texture to its new position
     if (!deltaNegative.equals(zeroVector)) {
-      // const renderer = useRenderer();
-  
       const position = deltaNegative.clone();
       const sourceBox = new THREE.Box3(
         new THREE.Vector3(0, 0, 0),
@@ -889,7 +886,6 @@ float roughnessFactor = roughness;
       if (position.x < 0) {
         const deltaX = -position.x;
         sourceBox.min.x += deltaX;
-        // sourceBox.max.x -= deltaX;
         position.x += deltaX;
       } else if (position.x > 0) {
         sourceBox.max.x -= position.x;
@@ -897,7 +893,6 @@ float roughnessFactor = roughness;
       if (position.y < 0) {
         const deltaY = -position.y;
         sourceBox.min.y += deltaY;
-        // sourceBox.max.y -= deltaY;
         position.y += deltaY;
       } else if (position.y > 0) {
         sourceBox.max.y -= position.y;
@@ -905,35 +900,13 @@ float roughnessFactor = roughness;
       if (position.z < 0) {
         const deltaZ = -position.z;
         sourceBox.min.z += deltaZ;
-        // sourceBox.max.z -= deltaZ;
         position.z += deltaZ;
-        // console.log('negative');
       } else if (position.z > 0) {
         sourceBox.max.z -= position.z;
-        // console.log('positive');
       }
 
-      // clip max
-      // sourceBox.max.x = Math.min(sourceBox.max.x, terrainSize);
-      // sourceBox.max.y = Math.min(sourceBox.max.y, terrainSize);
-      // sourceBox.max.z = Math.min(sourceBox.max.z, terrainSize);
-
-      // debugger;
-      // console.log('copy textures', position.toArray().join(','), sourceBox.min.toArray().join(','), sourceBox.max.toArray().join(','));
       _writeTex3dWithin(this.skylightTex, lightTexSize, position, sourceBox);
       _writeTex3dWithin(this.aoTex, lightTexSize, position, sourceBox);
-
-      /* const w = sourceBox.max.x - sourceBox.min.x;
-      const h = sourceBox.max.y - sourceBox.min.y;
-      const d = sourceBox.max.z - sourceBox.min.z;
-      const damageTex = new THREE.DataTexture3D(
-        new Uint8Array(w * h * d).fill(128),
-        w, h, d
-      );
-      damageTex.format = THREE.RedFormat;
-      damageTex.type = THREE.UnsignedByteType;
-      const level = 0;
-      renderer.copyTextureToTexture3D(sourceBox, position, damageTex, aoTex, level); */
     }
   }
 }
