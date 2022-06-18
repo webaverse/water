@@ -975,7 +975,6 @@ class TerrainChunkGenerator {
 
     chunk.binding = {
       abortController,
-      // signal,
     };
 
     return signal;
