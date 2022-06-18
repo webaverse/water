@@ -58,11 +58,6 @@ const _writeTex3d = (dstTex, dstSize, dstPosition, srcArray, sourceBox) => {
   const w = sourceBox.max.x - sourceBox.min.x + 1;
   const h = sourceBox.max.y - sourceBox.min.y + 1;
   const d = sourceBox.max.z - sourceBox.min.z + 1;
-  /* const srcTex = new THREE.DataTexture3D(srcArray, w, h, d);
-  srcTex.format = THREE.RedFormat;
-  srcTex.type = THREE.UnsignedByteType;
-  srcTex.flipY = false;
-  srcTex.needsUpdate = true; */
 
   const level = 0;
 
