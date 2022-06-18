@@ -889,7 +889,7 @@ float roughnessFactor = roughness;
       if (position.x < 0) {
         const deltaX = -position.x;
         sourceBox.min.x += deltaX;
-        sourceBox.max.x -= deltaX;
+        // sourceBox.max.x -= deltaX;
         position.x += deltaX;
       } else if (position.x > 0) {
         sourceBox.max.x -= position.x;
@@ -897,7 +897,7 @@ float roughnessFactor = roughness;
       if (position.y < 0) {
         const deltaY = -position.y;
         sourceBox.min.y += deltaY;
-        sourceBox.max.y -= deltaY;
+        // sourceBox.max.y -= deltaY;
         position.y += deltaY;
       } else if (position.y > 0) {
         sourceBox.max.y -= position.y;
@@ -905,7 +905,7 @@ float roughnessFactor = roughness;
       if (position.z < 0) {
         const deltaZ = -position.z;
         sourceBox.min.z += deltaZ;
-        sourceBox.max.z -= deltaZ;
+        // sourceBox.max.z -= deltaZ;
         position.z += deltaZ;
         // console.log('negative');
       } else if (position.z > 0) {
