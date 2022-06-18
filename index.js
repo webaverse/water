@@ -53,7 +53,7 @@ const _copyArray3d = (dstArray, dstSize, dstPosition, srcArray, sourceBox) => {
     }
   }
 };
-const _copyArray3dWithin = (array, dstPosition, sourceBox) => {
+const _copyArray3dWithin = (array, dstSize, dstPosition, sourceBox) => {
   // note that we need to pay attention to the copy direction
   // if the src < dst, we need to copy backwards
   const sw = sourceBox.max.x - sourceBox.min.x + 1;
@@ -83,8 +83,8 @@ const _copyArray3dWithin = (array, dstPosition, sourceBox) => {
       const sy = y + sourceBox.min.y;
       const dy = dstPosition.y + y;
       for (let x = startX; x !== endX; x += deltaX) {
-        const srcIndex = x + sourceBox.min.x + sy * sw + sz * sw * sh;
-        const dstIndex = x + dstPosition.x + dy * array.width + dz * array.width * array.height;
+        const srcIndex = x + sourceBox.min.x + sy * dstSize.x + sz * dstSize.x * dstSize.y;
+        const dstIndex = x + dstPosition.x + dy * dstSize.x + dz * dstSize.x * dstSize.y;
         array[dstIndex] = array[srcIndex];
       }
     }
@@ -108,10 +108,10 @@ const _writeTex3d = (dstTex, dstSize, dstPosition, srcArray, sourceBox) => {
 
   renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
 };
-const _writeTex3dWithin = (dstTex, dstPosition, sourceBox) => {
+const _writeTex3dWithin = (dstTex, dstSize, dstPosition, sourceBox) => {
   const renderer = useRenderer();
 
-  _copyArray3dWithin(dstTex.image.data, dstPosition, sourceBox);
+  _copyArray3dWithin(dstTex.image.data, dstSize, dstPosition, sourceBox);
   
   const w = sourceBox.max.x - sourceBox.min.x + 1;
   const h = sourceBox.max.y - sourceBox.min.y + 1;
@@ -908,8 +908,8 @@ float roughnessFactor = roughness;
         sourceBox.max.z = terrainSize - position.z;
       }
 
-      _writeTex3dWithin(this.skylightTex, position, sourceBox);
-      _writeTex3dWithin(this.aoTex, position, sourceBox);
+      _writeTex3dWithin(this.skylightTex, lightTexSize, position, sourceBox);
+      _writeTex3dWithin(this.aoTex, lightTexSize, position, sourceBox);
 
       /* const w = sourceBox.max.x - sourceBox.min.x;
       const h = sourceBox.max.y - sourceBox.min.y;
