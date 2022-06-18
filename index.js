@@ -124,9 +124,7 @@ const _writeTex3dWithin = (dstTex, dstSize, dstPosition, sourceBox) => {
 
   const level = 0;
 
-  dstTex.needsUpdate = true;
-
-  // renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
+  renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
 };
 
 const mapNames = [
