@@ -124,7 +124,9 @@ const _writeTex3dWithin = (dstTex, dstSize, dstPosition, sourceBox) => {
 
   const level = 0;
 
-  renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
+  dstTex.needsUpdate = true;
+
+  // renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
 };
 
 const mapNames = [
@@ -367,9 +369,9 @@ uniform float uTerrainSize;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
 varying vec3 vPosition;
-varying vec3 vWorldPosition;
+// varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
-varying vec3 vUvLight;
+// varying vec3 vUvLight;
         `);
         shader.vertexShader = shader.vertexShader.replace(`#include <worldpos_vertex>`, `\
 // #if defined( USE_ENVMAP ) || defined( DISTANCE ) || defined ( USE_SHADOWMAP ) || defined ( USE_TRANSMISSION )
@@ -381,11 +383,11 @@ varying vec3 vUvLight;
   worldPosition = modelMatrix * worldPosition;
 // #endif
 
-vWorldPosition = worldPosition.xyz; // XXX use local position instead of world position?
+// vWorldPosition = worldPosition.xyz; // XXX use local position instead of world position?
 vWorldNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
 vBiomes = biomes;
 vBiomesWeights = biomesWeights;
-vUvLight = (vWorldPosition - uLightBasePosition); // / uTerrainSize;
+// vUvLight = (vPosition - uLightBasePosition); // / uTerrainSize;
         `);
 
         // fragment shader
@@ -412,7 +414,7 @@ flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
 varying vec3 vPosition;
 varying vec3 vWorldNormal;
-varying vec3 vUvLight;
+// varying vec3 vUvLight;
 
 vec4 fourTapSample(
   sampler2D atlas,
@@ -637,7 +639,7 @@ float roughnessFactor = roughness;
 {
   const float numLightBands = 8.;
 
-  vec3 uvLight = (vPosition - uLightBasePosition) / uTerrainSize;
+  vec3 uvLight = (vPosition - uLightBasePosition) / uTerrainSize; // XXX this can be interpolated in the vertex shader
   // uvLight.y += 2. / uTerrainSize;
   // uvLight = 1. - uvLight.y;
   // uvLight.y = 1. - uvLight.y;
@@ -702,7 +704,7 @@ float roughnessFactor = roughness;
     });
     const lightBasePosition = new THREE.Vector3(
       -terrainSize/2,
-      terrainSize,
+      0,
       -terrainSize/2
     );
     material.uniforms = (() => {
@@ -885,29 +887,39 @@ float roughnessFactor = roughness;
 
       // clip min
       if (position.x < 0) {
-        sourceBox.min.x -= position.x;
-        position.x = 0;
+        const deltaX = -position.x;
+        sourceBox.min.x += deltaX;
+        sourceBox.max.x -= deltaX;
+        position.x += deltaX;
+      } else if (position.x > 0) {
+        sourceBox.max.x -= position.x;
       }
       if (position.y < 0) {
-        sourceBox.min.y -= position.y;
-        position.y = 0;
+        const deltaY = -position.y;
+        sourceBox.min.y += deltaY;
+        sourceBox.max.y -= deltaY;
+        position.y += deltaY;
+      } else if (position.y > 0) {
+        sourceBox.max.y -= position.y;
       }
       if (position.z < 0) {
-        sourceBox.min.z -= position.z;
-        position.z = 0;
+        const deltaZ = -position.z;
+        sourceBox.min.z += deltaZ;
+        sourceBox.max.z -= deltaZ;
+        position.z += deltaZ;
+        // console.log('negative');
+      } else if (position.z > 0) {
+        sourceBox.max.z -= position.z;
+        // console.log('positive');
       }
 
       // clip max
-      if (position.x + sourceBox.max.x >= terrainSize) {
-        sourceBox.max.x = terrainSize - position.x;
-      }
-      if (position.y + sourceBox.max.y >= terrainSize) {
-        sourceBox.max.y = terrainSize - position.y;
-      }
-      if (position.z + sourceBox.max.z >= terrainSize) {
-        sourceBox.max.z = terrainSize - position.z;
-      }
+      // sourceBox.max.x = Math.min(sourceBox.max.x, terrainSize);
+      // sourceBox.max.y = Math.min(sourceBox.max.y, terrainSize);
+      // sourceBox.max.z = Math.min(sourceBox.max.z, terrainSize);
 
+      // debugger;
+      // console.log('copy textures', position.toArray().join(','), sourceBox.min.toArray().join(','), sourceBox.max.toArray().join(','));
       _writeTex3dWithin(this.skylightTex, lightTexSize, position, sourceBox);
       _writeTex3dWithin(this.aoTex, lightTexSize, position, sourceBox);
 
