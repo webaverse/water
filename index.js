@@ -741,7 +741,7 @@ float roughnessFactor = roughness;
         needsUpdate: true,
       };
       uniforms.uLightBasePosition = {
-        value: lightBasePosition.clone(),
+        value: lightBasePosition,
         needsUpdate: true,
       };
       uniforms.uTerrainSize = {
@@ -760,8 +760,6 @@ float roughnessFactor = roughness;
 
     this.skylightTex = skylightTex;
     this.aoTex = aoTex;
-
-    // this.lightBasePosition = lightBasePosition;
   }
   async addChunk(chunk, {
     signal,
