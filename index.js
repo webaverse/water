@@ -51,6 +51,43 @@ const _copyArray3d = (dstArray, dstSize, dstPosition, srcArray, sourceBox) => {
     }
   }
 };
+const _copyArray3dWithin = (array, dstPosition, sourceBox) => {
+  // note that we need to pay attention to the copy direction
+  // if the src < dst, we need to copy backwards
+  const sw = sourceBox.max.x - sourceBox.min.x + 1;
+  const sh = sourceBox.max.y - sourceBox.min.y + 1;
+  const sd = sourceBox.max.z - sourceBox.min.z + 1;
+
+  const flipX = sourceBox.min.x < dstPosition.x;
+  const flipY = sourceBox.min.y < dstPosition.y;
+  const flipZ = sourceBox.min.z < dstPosition.z;
+
+  const startX = flipX ? sw - 1 : 0;
+  const startY = flipY ? sh - 1 : 0;
+  const startZ = flipZ ? sd - 1 : 0;
+
+  const endX = flipX ? -1 : sw;
+  const endY = flipY ? -1 : sh;
+  const endZ = flipZ ? -1 : sd;
+
+  const deltaX = flipX ? -1 : 1;
+  const deltaY = flipY ? -1 : 1;
+  const deltaZ = flipZ ? -1 : 1;
+
+  for (let z = startZ; z !== endZ; z += deltaZ) {
+    const sz = z + sourceBox.min.z;
+    const dz = dstPosition.z + z;
+    for (let y = startY; y !== endY; y += deltaY) {
+      const sy = y + sourceBox.min.y;
+      const dy = dstPosition.y + y;
+      for (let x = startX; x !== endX; x += deltaX) {
+        const srcIndex = x + sourceBox.min.x + sy * sw + sz * sw * sh;
+        const dstIndex = x + dstPosition.x + dy * array.width + dz * array.width * array.height;
+        array[dstIndex] = array[srcIndex];
+      }
+    }
+  }
+};
 const _writeTex3d = (dstTex, dstSize, dstPosition, srcArray, sourceBox) => {
   const renderer = useRenderer();
 
