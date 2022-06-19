@@ -76,7 +76,7 @@ const _copyArray3dWithin = (array, dstSize, dstPosition, sourceBox) => {
   const startY = flipY ? sh - 1 : 0;
   const startZ = flipZ ? sd - 1 : 0;
 
-  const endX = flipX ? -1 : sw;
+  // const endX = flipX ? -1 : sw;
   const endY = flipY ? -1 : sh;
   const endZ = flipZ ? -1 : sd;
 
@@ -838,7 +838,7 @@ float roughnessFactor = roughness;
       _handleMesh();
 
       const _handleLighting = () => {
-        const renderer = useRenderer();
+        // const renderer = useRenderer();
 
         const position = localVector.copy(chunk)
           .multiplyScalar(chunkWorldSize)
