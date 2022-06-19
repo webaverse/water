@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 import biomeSpecs from './biomes.js';
 
-const {useApp, useLocalPlayer, useScene, useRenderer, useFrame, useMaterials, useCleanup, usePhysics, useLoaders, useInstancing, useDcWorkerManager, useLodder} = metaversefile;
+const {useApp, useLocalPlayer, useScene, useRenderer, useFrame, useMaterials, useCleanup, usePhysics, useLoaders, useInstancing, useProcGenManager, useLodder} = metaversefile;
 
 // const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 
@@ -21,8 +21,8 @@ const localBox = new THREE.Box3();
 
 const zeroVector = new THREE.Vector3();
 
-const dcWorkerManager = useDcWorkerManager();
-const chunkWorldSize = dcWorkerManager.chunkSize;
+const procGenManager = useProcGenManager();
+const chunkWorldSize = procGenManager.chunkSize;
 const terrainSize = chunkWorldSize * 4;
 const chunkRadius = Math.sqrt(chunkWorldSize * chunkWorldSize * 3);
 const numLods = 1;
@@ -272,14 +272,15 @@ const bakeBiomesAtlas = async ({
 };
 // window.bakeBiomesAtlas = bakeBiomesAtlas;
 
-const {BatchedMesh} = useInstancing();
+const {BatchedMesh, GeometryAllocator} = useInstancing();
 class TerrainMesh extends BatchedMesh {
   constructor({
+    procGenInstance,
     physics,
     biomeUvDataTexture,
     atlasTextures,
   }) {
-    const allocator = new dcWorkerManager.constructor.GeometryAllocator([
+    const allocator = new GeometryAllocator([
       {
         name: 'position',
         Type: Float32Array,
@@ -761,6 +762,7 @@ float roughnessFactor = roughness;
     super(geometry, material, allocator);
     this.frustumCulled = false;
 
+    this.procGenInstance = procGenInstance;
     this.physics = physics;
     this.allocator = allocator;
     this.physicsObjects = [];
@@ -775,7 +777,7 @@ float roughnessFactor = roughness;
     this.drawChunk(chunk, renderData, signal);
   }
   async getChunkRenderData(chunk, signal) {
-    const meshData = await dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray, {
+    const meshData = await this.procGenInstance.dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray, {
       signal,
     });
     if (meshData) {
@@ -925,11 +927,13 @@ float roughnessFactor = roughness;
 
 class TerrainChunkGenerator {
   constructor({
+    procGenInstance,
     physics,
     biomeUvDataTexture,
     atlasTextures,
   } = {}) {
     // parameters
+    this.procGenInstance = procGenInstance;
     this.physics = physics;
     this.biomeUvDataTexture = biomeUvDataTexture;
     this.atlasTextures = atlasTextures;
@@ -939,6 +943,7 @@ class TerrainChunkGenerator {
     this.object.name = 'terrain-chunk-generator';
 
     this.terrainMesh = new TerrainMesh({
+      procGenInstance: this.procGenInstance,
       physics: this.physics,
       biomeUvDataTexture: this.biomeUvDataTexture,
       atlasTextures: this.atlasTextures,
@@ -1028,7 +1033,7 @@ class TerrainChunkGenerator {
     // perform damage
     const hitPosition = localVector.copy(e.hitPosition)
       .applyMatrix4(localMatrix.copy(this.terrainMesh.matrixWorld).invert());
-    const chunks = await dcWorkerManager.drawSphereDamage(hitPosition, 3);
+    const chunks = await this.procGenInstance.dcWorkerManager.drawSphereDamage(hitPosition, 3);
     if (chunks) {
       // generate the new chunks
       let meshSpecs = await Promise.all(chunks.map(async chunkSpec => {
@@ -1041,7 +1046,7 @@ class TerrainChunkGenerator {
         )
           .divideScalar(chunkWorldSize);
         const signal = this.bindChunk(chunk);
-        const meshData = await dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray, {
+        const meshData = await this.procGenInstance.dcWorkerManager.generateChunkRenderable(chunk, chunk.lodArray, {
           signal,
         });
         if (meshData) {
@@ -1096,6 +1101,7 @@ export default (e) => {
   const app = useApp();
   const physics = usePhysics();
   const {LodChunkTracker} = useLodder();
+  const procGenManager = useProcGenManager();
 
   app.name = 'dual-contouring-terrain';
 
@@ -1150,7 +1156,10 @@ export default (e) => {
       atlasTextures[mapNames[i]] = compressedTexture;
     }
 
+    const procGenInstance = procGenManager.getInstance(null);
+
     generator = new TerrainChunkGenerator({
+      procGenInstance,
       physics,
       biomeUvDataTexture,
       atlasTextures,
