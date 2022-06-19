@@ -955,7 +955,6 @@ class TerrainChunkGenerator {
     return this.object.children;
   }
   getPhysicsObjects() {
-    // console.log('get physics object', this.terrainMesh.physicsObjects);
     return this.terrainMesh.physicsObjects;
   }
 
@@ -989,9 +988,7 @@ class TerrainChunkGenerator {
     (async () => {
       try {
         const oldAbortController = oldChunk.binding.abortController;
-        // const oldSignal = oldAbortController.signal;
         const newSignal = this.bindChunk(newChunk);
-        // const newAbortController = newChunk.binding.abortController;
 
         const abortOldChunk = e => {
           oldAbortController.abort(abortError);
@@ -1004,10 +1001,6 @@ class TerrainChunkGenerator {
 
         this.disposeChunk(oldChunk);
         this.terrainMesh.drawChunk(newChunk, renderData, newSignal);
-
-        // newChunk.binding = oldChunk.binding;
-        // oldChunk.binding = null;
-        // XXX
       } catch (err) {
         if (err !== abortError) {
           console.warn(err);
@@ -1100,8 +1093,10 @@ class TerrainChunkGenerator {
 export default (e) => {
   const app = useApp();
   const physics = usePhysics();
-  const {LodChunkTracker} = useLodder();
   const procGenManager = useProcGenManager();
+
+  const seed = app.getComponent('seed') ?? null;
+  const range = app.getComponent('range') ?? null;
 
   app.name = 'dual-contouring-terrain';
 
@@ -1156,7 +1151,12 @@ export default (e) => {
       atlasTextures[mapNames[i]] = compressedTexture;
     }
 
-    const procGenInstance = procGenManager.getInstance(null);
+    const procGenInstance = procGenManager.getInstance(seed);
+    if (Array.isArray(range)) {
+      // XXX make this also set the lodder range
+      // XXX first the lodders need to be merged into the procgen instance
+      procGenInstance.dcWorkerManager.setRange(range);
+    }
 
     generator = new TerrainChunkGenerator({
       procGenInstance,
@@ -1164,12 +1164,20 @@ export default (e) => {
       biomeUvDataTexture,
       atlasTextures,
     });
-    tracker = new LodChunkTracker(generator, {
+    tracker = procGenInstance.getChunkTracker({
+      numLods,
+      trackY: true,
+      relod: true,
+    });
+    /* tracker = new LodChunkTracker(generator, {
       chunkWorldSize,
       numLods,
       chunkHeight: chunkWorldSize,
-    });
+    }); */
     tracker.addEventListener('coordupdate', coordupdate);
+    tracker.addEventListener('chunkadd', chunkadd);
+    tracker.addEventListener('chunkremove', chunkremove);
+    tracker.addEventListener('chunkrelod', chunkrelod);
 
     app.add(generator.object);
     generator.object.updateMatrixWorld();
@@ -1185,6 +1193,18 @@ export default (e) => {
   const coordupdate = e => {
     const {coord, min2xCoord} = e.data;
     generator.terrainMesh.updateCoord(coord, min2xCoord);
+  };
+  const chunkadd = e => {
+    const {chunk} = e.data;
+    generator.generateChunk(chunk);
+  };
+  const chunkremove = e => {
+    const {chunk} = e.data;
+    generator.disposeChunk(chunk);
+  };
+  const chunkrelod = e => {
+    const {oldChunk, newChunk} = e.data;
+    generator.relodChunk(oldChunk, newChunk);
   };
 
   useFrame(() => {
@@ -1203,7 +1223,10 @@ export default (e) => {
     live = false;
     if (tracker) {
       tracker.destroy();
-      tracker.removeEventListener('coordupdate', coordupdate);
+      /* tracker.removeEventListener('coordupdate', coordupdate);
+      tracker.removeEventListener('chunkadd', chunkadd);
+      tracker.removeEventListener('chunkremove', chunkremove);
+      tracker.removeEventListener('chunkrelod', chunkrelod); */
     }
   });
 
