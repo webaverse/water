@@ -1185,7 +1185,6 @@ export default (e) => {
 
   app.getPhysicsObjects = () => generator ? generator.getPhysicsObjects() : [];
 
-  // console.log('got hit tracker', app.hitTracker);
   app.addEventListener('hit', e => {
     generator && tracker && generator.hit(e, tracker);
   });
@@ -1223,12 +1222,8 @@ export default (e) => {
     live = false;
     if (tracker) {
       tracker.destroy();
-      /* tracker.removeEventListener('coordupdate', coordupdate);
-      tracker.removeEventListener('chunkadd', chunkadd);
-      tracker.removeEventListener('chunkremove', chunkremove);
-      tracker.removeEventListener('chunkrelod', chunkrelod); */
     }
   });
 
-  return app
+  return app;
 }
