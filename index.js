@@ -1153,9 +1153,7 @@ export default (e) => {
 
     const procGenInstance = procGenManager.getInstance(seed);
     if (Array.isArray(range)) {
-      // XXX make this also set the lodder range
-      // XXX first the lodders need to be merged into the procgen instance
-      procGenInstance.dcWorkerManager.setRange(range);
+      procGenInstance.setRange(range);
     }
 
     generator = new TerrainChunkGenerator({
