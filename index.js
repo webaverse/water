@@ -253,16 +253,19 @@ class TerrainMesh extends BatchedMesh {
 	uniform mat3 uvTransform;
 #endif
 
+precision highp sampler3D;
+
 attribute ivec4 biomes;
 attribute vec4 biomesWeights;
 uniform vec3 uLightBasePosition;
 uniform float uTerrainSize;
+uniform sampler3D uSkylightTex;
+uniform sampler3D uAoTex;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
 varying vec3 vPosition;
-// varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
-// varying vec3 vUvLight;
+varying float vLightValue;
         `);
         shader.vertexShader = shader.vertexShader.replace(`#include <worldpos_vertex>`, `\
 // #if defined( USE_ENVMAP ) || defined( DISTANCE ) || defined ( USE_SHADOWMAP ) || defined ( USE_TRANSMISSION )
@@ -274,11 +277,52 @@ varying vec3 vWorldNormal;
   worldPosition = modelMatrix * worldPosition;
 // #endif
 
-// vWorldPosition = worldPosition.xyz; // XXX use local position instead of world position?
-vWorldNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
-vBiomes = biomes;
-vBiomesWeights = biomesWeights;
-// vUvLight = (vPosition - uLightBasePosition); // / uTerrainSize;
+// varyings
+{
+  vWorldNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
+  vBiomes = biomes;
+  vBiomesWeights = biomesWeights;
+}
+
+// lighting
+{
+  const float numLightBands = 8.;
+
+  vec3 uvLight = (vPosition - uLightBasePosition) / uTerrainSize; // XXX this can be interpolated in the vertex shader
+  float lightValue = 1.;
+
+  // skylight
+  {
+    vec4 skylightColor = texture(uSkylightTex, uvLight);
+    float skylightValue = skylightColor.r * 255.;
+
+    const float maxSkylight = 8.;
+    skylightValue /= maxSkylight;
+
+    lightValue *= skylightValue;
+  }
+  // ao
+  {
+    vec4 aoColor = texture(uAoTex, uvLight);
+    float aoValue = aoColor.r * 255.;
+    
+    const float maxAo = 27.;
+    const float baseAo = 0.3;
+    aoValue /= maxAo;
+    aoValue = baseAo + aoValue * (1. - baseAo);
+    
+    lightValue *= aoValue;
+  }
+
+  // clip lighting
+  if (uvLight.x <= 0. || uvLight.x >= uTerrainSize || uvLight.z <= 0. || uvLight.z >= uTerrainSize || uvLight.y <= 0. || uvLight.y >= uTerrainSize) {
+    lightValue = 0.;
+  }
+  // adjust lighting
+  lightValue *= 2.;
+
+  vLightValue = lightValue;
+}
         `);
 
         // fragment shader
@@ -288,8 +332,6 @@ vBiomesWeights = biomesWeights;
   // uniform sampler2D map;
 #endif
 
-precision highp sampler3D;
-
 uniform sampler2D Base_Color;
 uniform sampler2D Emissive;
 uniform sampler2D Normal;
@@ -297,8 +339,6 @@ uniform sampler2D Roughness;
 uniform sampler2D Ambient_Occlusion;
 uniform sampler2D Height;
 uniform sampler2D biomeUvDataTexture;
-uniform sampler3D uSkylightTex;
-uniform sampler3D uAoTex;
 uniform vec3 uLightBasePosition;
 uniform float uTerrainSize;
 flat varying ivec4 vBiomes;
@@ -306,6 +346,7 @@ varying vec4 vBiomesWeights;
 varying vec3 vPosition;
 varying vec3 vWorldNormal;
 // varying vec3 vUvLight;
+varying float vLightValue;
 
 vec4 fourTapSample(
   sampler2D atlas,
@@ -528,54 +569,7 @@ float roughnessFactor = roughness;
 
 // lighting
 {
-  const float numLightBands = 8.;
-
-  vec3 uvLight = (vPosition - uLightBasePosition) / uTerrainSize; // XXX this can be interpolated in the vertex shader
-  // uvLight.y += 2. / uTerrainSize;
-  // uvLight = 1. - uvLight.y;
-  // uvLight.y = 1. - uvLight.y;
-  float lightValue = 1.;
-
-  // skylight
-  {
-    vec4 skylightColor = texture(uSkylightTex, uvLight);
-    float skylightValue = skylightColor.r * 255.;
-
-    const float maxSkylight = 8.;
-    skylightValue /= maxSkylight;
-    // skylightValue *= 0.5;
-    // skylightValue = ceil(skylightValue * numLightBands) / numLightBands;
-
-    lightValue *= skylightValue;
-  }
-  // ao
-  {
-    vec4 aoColor = texture(uAoTex, uvLight);
-    float aoValue = aoColor.r * 255.;
-    
-    const float discount = 0.;
-    const float maxAo = (27. - discount);
-    const float baseAo = 0.3;
-    // const float baseAo = 0.;
-    aoValue -= discount;
-    aoValue /= maxAo;
-    aoValue = baseAo + aoValue * (1. - baseAo);
-    
-    lightValue *= aoValue;
-  }
-
-  // apply lighting
-  lightValue *= 2.;
-  // lightValue = ceil(lightValue * numLightBands) / numLightBands;
-  diffuseColor.rgb *= lightValue;
-
-  // diffuseColor.rgb += uvLight;
-  // diffuseColor.rgb += uvLight * 0.05;
-  // vec4 aoColor = texture(uAoTex, uvLight);
-
-  if (uvLight.x <= 0. || uvLight.x >= uTerrainSize || uvLight.z <= 0. || uvLight.z >= uTerrainSize || uvLight.y <= 0. || uvLight.y >= uTerrainSize) {
-    diffuseColor.rgb = vec3(0.);
-  }
+  diffuseColor.rgb *= vLightValue;
   diffuseColor.a = 1.;
 }
         `);
