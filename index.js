@@ -622,7 +622,7 @@ float roughnessFactor = roughness;
         needsUpdate: true,
       };
       uniforms.uTerrainSize = {
-        value: terrainSize,
+        value: terrainSize, // XXX needs to be range-aware
         needsUpdate: true,
       };
 
@@ -968,10 +968,7 @@ export default (e) => {
       atlasTextures[mapNames[i]] = compressedTexture;
     }
 
-    const procGenInstance = procGenManager.getInstance(seed);
-    if (range) {
-      procGenInstance.setRange(range);
-    }
+    const procGenInstance = procGenManager.getInstance(seed, range);
 
     generator = new TerrainChunkGenerator({
       procGenInstance,
@@ -984,6 +981,7 @@ export default (e) => {
       trackY: true,
       relod: true,
     });
+    // tracker.name = 'terrain';
     /* tracker = new LodChunkTracker(generator, {
       chunkWorldSize,
       numLods,
@@ -993,6 +991,7 @@ export default (e) => {
     tracker.addEventListener('chunkadd', chunkadd);
     tracker.addEventListener('chunkremove', chunkremove);
     tracker.addEventListener('chunkrelod', chunkrelod);
+    // tracker.emitEvents(chunkadd);
 
     app.add(generator.object);
     generator.object.updateMatrixWorld();
