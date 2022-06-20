@@ -10,16 +10,16 @@ const {useApp, useLocalPlayer, useScene, useRenderer, useFrame, useMaterials, us
 
 const localVector = new THREE.Vector3();
 const localVector2 = new THREE.Vector3();
-const localVector3 = new THREE.Vector3();
-const localVector4 = new THREE.Vector3();
+// const localVector3 = new THREE.Vector3();
+// const localVector4 = new THREE.Vector3();
 const localQuaternion = new THREE.Quaternion();
 const localMatrix = new THREE.Matrix4();
 const localMatrix2 = new THREE.Matrix4();
 // const localColor = new THREE.Color();
 const localSphere = new THREE.Sphere();
-const localBox = new THREE.Box3();
+// const localBox = new THREE.Box3();
 
-const zeroVector = new THREE.Vector3();
+// const zeroVector = new THREE.Vector3();
 
 const procGenManager = useProcGenManager();
 const chunkWorldSize = procGenManager.chunkSize;
@@ -33,7 +33,6 @@ const abortError = new Error('chunk disposed');
 const fakeMaterial = new THREE.MeshBasicMaterial({
   color: 0xffffff,
 });
-const lightTexSize = new THREE.Vector3(terrainSize, terrainSize, terrainSize);
 
 class ChunkRenderData {
   constructor(meshData, geometryBuffer) {
@@ -41,109 +40,6 @@ class ChunkRenderData {
     this.geometryBuffer = geometryBuffer;
   }
 }
-
-const _copyArray3d = (dstArray, dstSize, dstPosition, srcArray, sourceBox) => {
-  const sw = sourceBox.max.x - sourceBox.min.x + 1;
-  const sh = sourceBox.max.y - sourceBox.min.y + 1;
-  const sd = sourceBox.max.z - sourceBox.min.z + 1;
-  
-  for (let z = 0; z < sd; z++) {
-    const sz = z + sourceBox.min.z;
-    const dz = dstPosition.z + z;
-    for (let y = 0; y < sh; y++) {
-      const sy = y + sourceBox.min.y;
-      const dy = dstPosition.y + y;
-      let srcIndex = sourceBox.min.x + sy * sw + sz * sw * sh;
-      let dstIndex = dstPosition.x + dy * dstSize.x + dz * dstSize.x * dstSize.y;
-      for (let x = 0; x < sw; x++) {
-        dstArray[dstIndex++] = srcArray[srcIndex++];
-      }
-    }
-  }
-};
-const _copyArray3dWithin = (array, dstSize, dstPosition, sourceBox) => {
-  // note that we need to pay attention to the copy direction
-  // if the src < dst, we need to copy backwards
-  const sw = sourceBox.max.x - sourceBox.min.x + 1;
-  const sh = sourceBox.max.y - sourceBox.min.y + 1;
-  const sd = sourceBox.max.z - sourceBox.min.z + 1;
-
-  const flipX = sourceBox.min.x < dstPosition.x;
-  const flipY = sourceBox.min.y < dstPosition.y;
-  const flipZ = sourceBox.min.z < dstPosition.z;
-
-  const startX = flipX ? sw - 1 : 0;
-  const startY = flipY ? sh - 1 : 0;
-  const startZ = flipZ ? sd - 1 : 0;
-
-  // const endX = flipX ? -1 : sw;
-  const endY = flipY ? -1 : sh;
-  const endZ = flipZ ? -1 : sd;
-
-  const deltaX = flipX ? -1 : 1;
-  const deltaY = flipY ? -1 : 1;
-  const deltaZ = flipZ ? -1 : 1;
-
-  for (let z = startZ; z !== endZ; z += deltaZ) {
-    const sz = z + sourceBox.min.z;
-    const dz = dstPosition.z + z;
-    for (let y = startY; y !== endY; y += deltaY) {
-      const sy = y + sourceBox.min.y;
-      const dy = dstPosition.y + y;
-      let srcIndex = startX + sourceBox.min.x + sy * dstSize.x + sz * dstSize.x * dstSize.y;
-      let dstIndex = startX + dstPosition.x + dy * dstSize.x + dz * dstSize.x * dstSize.y;
-      for (let x = 0; x < sw; x++) {
-        array[dstIndex] = array[srcIndex];
-        dstIndex += deltaX;
-        srcIndex += deltaX;
-      }
-    }
-  }
-};
-const _writeTex3d = (() => {
-  const localVector = new THREE.Vector3();
-  const localBox = new THREE.Box3();
-  return (dstTex, dstSize, dstPosition, srcArray, sourceBox) => {
-    const renderer = useRenderer();
-
-    _copyArray3d(dstTex.image.data, dstSize, dstPosition, srcArray, sourceBox);
-
-    const w = sourceBox.max.x - sourceBox.min.x + 1;
-    const h = sourceBox.max.y - sourceBox.min.y + 1;
-    const d = sourceBox.max.z - sourceBox.min.z + 1;
-
-    const destinationBox = localBox.set(
-      dstPosition,
-      localVector.set(dstPosition.x + w - 1, dstPosition.y + h - 1, dstPosition.z + d - 1),
-    );
-
-    const level = 0;
-
-    renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
-  };
-})();
-const _writeTex3dWithin = (() => {
-  const localVector = new THREE.Vector3();
-  const localBox = new THREE.Box3();
-  return (dstTex, dstSize, dstPosition, sourceBox) => {
-    const renderer = useRenderer();
-
-    _copyArray3dWithin(dstTex.image.data, dstSize, dstPosition, sourceBox);
-    
-    const w = sourceBox.max.x - sourceBox.min.x + 1;
-    const h = sourceBox.max.y - sourceBox.min.y + 1;
-    const d = sourceBox.max.z - sourceBox.min.z + 1;
-
-    const destinationBox = localBox.set(
-      dstPosition,
-      localVector.set(dstPosition.x + w - 1, dstPosition.y + h - 1, dstPosition.z + d - 1),
-    );
-
-    const level = 0;
-
-    renderer.copyTextureToTexture3D(destinationBox, dstPosition, dstTex, dstTex, level);
-  };
-})();
 
 const mapNames = [
   'Base_Color',
@@ -326,29 +222,7 @@ class TerrainMesh extends BatchedMesh {
     )
     grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping */
 
-    const skylightData = new Uint8Array(lightTexSize.x * lightTexSize.y * lightTexSize.z)//.fill(1);
-    const skylightTex = new THREE.DataTexture3D(skylightData, lightTexSize.x, lightTexSize.y, lightTexSize.z);
-    skylightTex.format = THREE.RedFormat;
-    skylightTex.type = THREE.UnsignedByteType;
-    skylightTex.minFilter = THREE.LinearFilter;
-    skylightTex.magFilter = THREE.LinearFilter;
-    // skylightTex.minFilter = THREE.NearestFilter;
-    // skylightTex.magFilter = THREE.NearestFilter;
-    skylightTex.flipY = false;
-    skylightTex.needsUpdate = true;
-    skylightTex.generateMipmaps = false;
-
-    const aoData = new Uint8Array(lightTexSize.x * lightTexSize.y * lightTexSize.z)//.fill(1);
-    const aoTex = new THREE.DataTexture3D(aoData, lightTexSize.x, lightTexSize.y, lightTexSize.z);
-    aoTex.format = THREE.RedFormat;
-    aoTex.type = THREE.UnsignedByteType;
-    aoTex.minFilter = THREE.LinearFilter;
-    aoTex.magFilter = THREE.LinearFilter;
-    // aoTex.minFilter = THREE.NearestFilter;
-    // aoTex.magFilter = THREE.NearestFilter;
-    aoTex.flipY = false;
-    aoTex.needsUpdate = true;
-    aoTex.generateMipmaps = false;
+    const lightMapper = procGenInstance.getLightMapper();
 
     const material = new THREE.MeshStandardMaterial({
       map: new THREE.Texture(),
@@ -719,11 +593,6 @@ float roughnessFactor = roughness;
         return shader;
       },
     });
-    const lightBasePosition = new THREE.Vector3(
-      -terrainSize/2,
-      0,
-      -terrainSize/2
-    );
     material.uniforms = (() => {
       const uniforms = {};
       
@@ -741,15 +610,15 @@ float roughnessFactor = roughness;
       }
       // lighting
       uniforms.uSkylightTex = {
-        value: skylightTex,
+        value: lightMapper.skylightTex,
         needsUpdate: true,
       };
       uniforms.uAoTex = {
-        value: aoTex,
+        value: lightMapper.aoTex,
         needsUpdate: true,
       };
       uniforms.uLightBasePosition = {
-        value: lightBasePosition,
+        value: lightMapper.lightBasePosition.clone(),
         needsUpdate: true,
       };
       uniforms.uTerrainSize = {
@@ -767,8 +636,7 @@ float roughnessFactor = roughness;
     this.allocator = allocator;
     this.physicsObjects = [];
 
-    this.skylightTex = skylightTex;
-    this.aoTex = aoTex;
+    this.lightMapper = lightMapper;
   }
   async addChunk(chunk, {
     signal,
@@ -823,7 +691,11 @@ float roughnessFactor = roughness;
         geometry.index.update(indexOffset, meshData.indices.length);
       };
       const _handleMesh = () => {
-        localSphere.center.set((chunk.x + 0.5) * chunkWorldSize, (chunk.y + 0.5) * chunkWorldSize, (chunk.z + 0.5) * chunkWorldSize)
+        localSphere.center.set(
+          (chunk.x + 0.5) * chunkWorldSize,
+          (chunk.y + 0.5) * chunkWorldSize,
+          (chunk.z + 0.5) * chunkWorldSize
+        )
           .applyMatrix4(this.matrixWorld);
         localSphere.radius = chunkRadius;
         const geometryBinding = this.allocator.alloc(
@@ -839,31 +711,7 @@ float roughnessFactor = roughness;
       };
       _handleMesh();
 
-      const _handleLighting = () => {
-        // const renderer = useRenderer();
-
-        const position = localVector.copy(chunk)
-          .multiplyScalar(chunkWorldSize)
-          .sub(this.material.uniforms.uLightBasePosition.value);
-        // console.log('got position', position.x, position.y, position.z);
-        if (
-          position.x >= 0 && position.x < terrainSize &&
-          position.y >= 0 && position.y < terrainSize &&
-          position.z >= 0 && position.z < terrainSize
-        ) {
-          const sourceBox = localBox.set(
-            localVector2.set(0, 0, 0),
-            localVector3.set(chunkWorldSize - 1, chunkWorldSize - 1, chunkWorldSize - 1)
-          );
-          // const level = 0;
-
-          _writeTex3d(this.skylightTex, lightTexSize, position, meshData.skylights, sourceBox);
-          _writeTex3d(this.aoTex, lightTexSize, position, meshData.aos, sourceBox);
-        } else {
-          // chunk out of lighting range
-        }
-      };
-      _handleLighting();
+      this.lightMapper.drawChunk(chunk, meshData);
 
       const _handlePhysics = async () => {
         this.matrixWorld.decompose(localVector, localQuaternion, localVector2);
@@ -881,45 +729,8 @@ float roughnessFactor = roughness;
     }
   }
   updateCoord(coord, min2xCoord) {
-    const lastPosition = this.material.uniforms.uLightBasePosition.value;
-    const newPosition = localVector.copy(min2xCoord).multiplyScalar(chunkWorldSize);
-    const deltaNegative = localVector2.copy(lastPosition)
-      .sub(newPosition);
-
-    if (!deltaNegative.equals(zeroVector)) {
-      const position = deltaNegative;
-      const sourceBox = localBox.set(
-        localVector3.set(0, 0, 0),
-        localVector4.set(terrainSize - 1, terrainSize - 1, terrainSize - 1)
-      );
-
-      // clip to texture bounds
-      if (position.x < 0) {
-        const deltaX = -position.x;
-        sourceBox.min.x += deltaX;
-        position.x += deltaX;
-      } else if (position.x > 0) {
-        sourceBox.max.x -= position.x;
-      }
-      if (position.y < 0) {
-        const deltaY = -position.y;
-        sourceBox.min.y += deltaY;
-        position.y += deltaY;
-      } else if (position.y > 0) {
-        sourceBox.max.y -= position.y;
-      }
-      if (position.z < 0) {
-        const deltaZ = -position.z;
-        sourceBox.min.z += deltaZ;
-        position.z += deltaZ;
-      } else if (position.z > 0) {
-        sourceBox.max.z -= position.z;
-      }
-
-      _writeTex3dWithin(this.skylightTex, lightTexSize, position, sourceBox);
-      _writeTex3dWithin(this.aoTex, lightTexSize, position, sourceBox);
-
-      this.material.uniforms.uLightBasePosition.value.copy(newPosition);
+    if (this.lightMapper.updateCoord(min2xCoord)) {
+      this.material.uniforms.uLightBasePosition.value.copy(this.lightMapper.lightBasePosition);
       this.material.uniforms.uLightBasePosition.needsUpdate = true;
     }
   }
