@@ -786,7 +786,7 @@ float roughnessFactor = roughness;
       _handlePhysics();
     }
   }
-  updateCoord(coord, min2xCoord) {
+  updateCoord(min2xCoord) {
     if (this.lightMapper.updateCoord(min2xCoord)) {
       this.material.uniforms.uLightBasePosition.value.copy(
         this.lightMapper.lightBasePosition
@@ -1086,8 +1086,8 @@ export default (e) => {
   });
 
   const coordupdate = (e) => {
-    const { coord, min2xCoord } = e.data;
-    generator.terrainMesh.updateCoord(coord, min2xCoord);
+    const {coord} = e.data;
+    generator.terrainMesh.updateCoord(coord);
   };
   const chunkadd = (e) => {
     const { chunk } = e.data;
