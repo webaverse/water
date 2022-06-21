@@ -829,20 +829,18 @@ class TerrainChunkGenerator {
     return this.terrainMesh.physicsObjects;
   }
 
-  generateChunk(chunk) {
+  async generateChunk(chunk) {
     const signal = this.bindChunk(chunk);
 
-    (async () => {
-      try {
-        await this.terrainMesh.addChunk(chunk, {
-          signal,
-        });
-      } catch (err) {
-        if (err !== abortError) {
-          console.warn(err);
-        }
+    try {
+      await this.terrainMesh.addChunk(chunk, {
+        signal,
+      });
+    } catch (err) {
+      if (err !== abortError) {
+        console.warn(err);
       }
-    })();
+    }
   }
   disposeChunk(chunk) {
     const binding = chunk.binding;
@@ -977,6 +975,7 @@ export default (e) => {
 
   const seed = app.getComponent('seed') ?? null;
   let range = app.getComponent('range') ?? null;
+  const wait = app.getComponent('wait') ?? false;
   if (range) {
     range = new THREE.Box3(
       new THREE.Vector3(range[0][0], range[0][1], range[0][2]),
@@ -1017,7 +1016,6 @@ export default (e) => {
         texture.needsUpdate = true;
         return texture;
       })();
-      // window.biomeUvDataTexture = biomeUvDataTexture;
 
       const { ktx2Loader } = useLoaders();
       const atlasTexturesArray = await Promise.all(
@@ -1033,7 +1031,6 @@ export default (e) => {
             })
         )
       );
-      // window.atlasTexturesArray = atlasTexturesArray;
       if (!live) return;
 
       const atlasTextures = {};
@@ -1073,6 +1070,16 @@ export default (e) => {
       tracker.addEventListener('chunkrelod', chunkrelod);
       // tracker.emitEvents(chunkadd);
 
+      if (wait) {
+        await new Promise((accept, reject) => {
+          tracker.addEventListener('update', () => {
+            accept();
+          }, {
+            once: true,
+          });
+        });
+      }
+
       app.add(generator.object);
       generator.object.updateMatrixWorld();
     })()
@@ -1090,15 +1097,15 @@ export default (e) => {
     generator.terrainMesh.updateCoord(coord);
   };
   const chunkadd = (e) => {
-    const { chunk } = e.data;
-    generator.generateChunk(chunk);
+    const {chunk, waitUntil} = e.data;
+    waitUntil(generator.generateChunk(chunk));
   };
   const chunkremove = (e) => {
-    const { chunk } = e.data;
+    const {chunk} = e.data;
     generator.disposeChunk(chunk);
   };
   const chunkrelod = (e) => {
-    const { oldChunk, newChunk } = e.data;
+    const {oldChunk, newChunk} = e.data;
     generator.relodChunk(oldChunk, newChunk);
   };
 
