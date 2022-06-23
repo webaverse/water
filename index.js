@@ -43,6 +43,7 @@ const bufferSize = 20 * 1024 * 1024;
 
 // const textureLoader = new THREE.TextureLoader();
 const abortError = new Error('chunk disposed');
+abortError.isAbortError = true;
 const fakeMaterial = new THREE.MeshBasicMaterial({
   color: 0xffffff,
 });
@@ -837,7 +838,7 @@ class TerrainChunkGenerator {
         signal,
       });
     } catch (err) {
-      if (err !== abortError) {
+      if (!err?.isAbortError) {
         console.warn(err);
       }
     }
