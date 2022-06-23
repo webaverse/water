@@ -144,14 +144,12 @@ class WaterMesh extends BatchedMesh {
 
 precision highp sampler3D;
 
-attribute ivec4 biomes;
-attribute vec4 biomesWeights;
+attribute int biome;
 uniform vec3 uLightBasePosition;
 uniform float uTerrainSize;
 uniform sampler3D uSkylightTex;
 uniform sampler3D uAoTex;
-flat varying ivec4 vBiomes;
-varying vec4 vBiomesWeights;
+flat varying int vBiome;
 varying vec3 vPosition;
 varying vec3 vWorldNormal;
 varying float vLightValue;
@@ -169,8 +167,7 @@ varying float vLightValue;
 // varyings
 {
   vWorldNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
-  vBiomes = biomes;
-  vBiomesWeights = biomesWeights;
+  vBiome = biome;
 }
 
 // lighting
@@ -229,8 +226,7 @@ uniform sampler2D Ambient_Occlusion;
 uniform sampler2D Height;
 uniform vec3 uLightBasePosition;
 uniform float uTerrainSize;
-flat varying ivec4 vBiomes;
-varying vec4 vBiomesWeights;
+flat varying int vBiome;
 varying vec3 vPosition;
 varying vec3 vWorldNormal;
 varying float vLightValue;
