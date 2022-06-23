@@ -2,24 +2,26 @@ import metaversefile from 'metaversefile';
 // import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 // import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
-import biomeSpecs from './biomes.js';
+// import biomeSpecs from './biomes.js';
 
 const {
   useApp,
   useLocalPlayer,
-  useScene,
-  useRenderer,
+  // useScene,
+  // useRenderer,
   useFrame,
-  useMaterials,
+  // useMaterials,
   useCleanup,
   usePhysics,
-  useLoaders,
+  // useLoaders,
   useInstancing,
   useProcGenManager,
-  useLodder,
+  // useLodder,
 } = metaversefile;
 
-// const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
+const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
+
+//
 
 const localVector = new THREE.Vector3();
 const localVector2 = new THREE.Vector3();
@@ -33,6 +35,8 @@ const localSphere = new THREE.Sphere();
 // const localBox = new THREE.Box3();
 
 // const zeroVector = new THREE.Vector3();
+
+//
 
 const procGenManager = useProcGenManager();
 const chunkWorldSize = procGenManager.chunkSize;
@@ -55,15 +59,13 @@ class ChunkRenderData {
   }
 }
 
-const mapNames = [
-  'Base_Color',
-  'Height',
-  'Normal',
-  'Roughness',
-  'Emissive',
-  'Ambient_Occlusion',
-];
-const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
+//
+
+const textureUrls = {
+  Base_Color: `${baseUrl}Vol_36_3_Water_Base_Color.png`,
+};
+const textureNames = Object.keys(textureUrls);
+/* const biomesPngTexturePrefix = `/images/stylized-textures/png/`;
 const biomesKtx2TexturePrefix = `/images/land-textures/`;
 const neededTexturePrefixes = (() => {
   const neededTexturePrefixesSet = new Set();
@@ -74,118 +76,11 @@ const neededTexturePrefixes = (() => {
   const neededTexturePrefixes = Array.from(neededTexturePrefixesSet);
   return neededTexturePrefixes;
 })();
-const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length));
-
-const loadImage = (u) =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      resolve(img);
-    };
-    img.onerror = (err) => {
-      if (/Emissive/i.test(u)) {
-        const blankCanvas = document.createElement('canvas');
-        blankCanvas.width = 1;
-        blankCanvas.height = 1;
-        resolve(blankCanvas);
-      } else {
-        reject(err);
-      }
-    };
-    img.crossOrigin = 'Anonymous';
-    img.src = u;
-  });
-function downloadFile(file, filename) {
-  const blobURL = URL.createObjectURL(file);
-  const tempLink = document.createElement('a');
-  tempLink.style.display = 'none';
-  tempLink.href = blobURL;
-  tempLink.setAttribute('download', filename);
-
-  document.body.appendChild(tempLink);
-  tempLink.click();
-  document.body.removeChild(tempLink);
-}
-// this method generates a deduplicted texture atlas for the texture sets used in the mesh
-// the output can be used by ./scripts/build-megatexture-atlas.sh to turn it into a KTX2 texture atlas
-const bakeBiomesAtlas = async ({ size = 8 * 1024 } = {}) => {
-  const atlasTextures = [];
-  const textureTileSize = size / texturesPerRow;
-  const halfTextureTileSize = textureTileSize / 2;
-
-  for (const mapName of mapNames) {
-    const neededTextureNames = neededTexturePrefixes.map(
-      (prefix) => `${prefix}${mapName}`
-    );
-
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-
-    document.body.appendChild(canvas);
-    canvas.style.cssText = `\
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 100;
-      width: 1024px;
-      height: 1024px;
-    `;
-
-    let index = 0;
-    for (const textureName of neededTextureNames) {
-      const x = index % texturesPerRow;
-      const y = Math.floor(index / texturesPerRow);
-
-      const u = biomesPngTexturePrefix + textureName + '.png';
-      const img = await loadImage(u);
-      console.log('load u', u, textureName, img.width, img.height);
-
-      for (let dy = 0; dy < 2; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          ctx.drawImage(
-            img,
-            x * textureTileSize + halfTextureTileSize * dx,
-            y * textureTileSize + halfTextureTileSize * dy,
-            halfTextureTileSize,
-            halfTextureTileSize
-          );
-        }
-      }
-      atlasTextures.push({
-        name: textureName,
-        uv: [
-          (x * textureTileSize) / size,
-          (y * textureTileSize) / size,
-          ((x + 1) * textureTileSize) / size,
-          ((y + 1) * textureTileSize) / size,
-        ],
-      });
-
-      index++;
-    }
-
-    const canvasBlob = await new Promise((resolve, reject) => {
-      canvas.toBlob(resolve, 'image/png');
-    });
-    downloadFile(canvasBlob, `${mapName}.png`);
-
-    document.body.removeChild(canvas);
-  }
-
-  // const atlasJson = {
-  //   textures: atlasTextures,
-  // };
-  // const atlasJsonString = JSON.stringify(atlasJson, null, 2);
-  // const atlasJsonBlob = new Blob([atlasJsonString], {type: 'application/json'});
-  // downloadFile(atlasJsonBlob, `megatexture-atlas.json`);
-};
-// window.bakeBiomesAtlas = bakeBiomesAtlas;
+const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length)); */
 
 const { BatchedMesh, GeometryAllocator } = useInstancing();
-class TerrainMesh extends BatchedMesh {
-  constructor({ procGenInstance, physics, biomeUvDataTexture, atlasTextures }) {
+class WaterMesh extends BatchedMesh {
+  constructor({ procGenInstance, physics, biomeUvDataTexture, textures }) {
     const allocator = new GeometryAllocator(
       [
         {
@@ -199,14 +94,9 @@ class TerrainMesh extends BatchedMesh {
           itemSize: 3,
         },
         {
-          name: 'biomes',
+          name: 'biome',
           Type: Int32Array,
-          itemSize: 4,
-        },
-        {
-          name: 'biomesWeights',
-          Type: Float32Array,
-          itemSize: 4,
+          itemSize: 1,
         },
       ],
       {
@@ -214,40 +104,26 @@ class TerrainMesh extends BatchedMesh {
         boundingType: 'sphere',
       }
     );
-    const { geometry } = allocator;
-
-    /* const earthTexture = textureLoader.load(
-      baseUrl + 'assets/textures/EarthBaseColor1.png'
-    );
-    earthTexture.wrapS = earthTexture.wrapT = THREE.RepeatWrapping;
-    earthTexture.encoding = THREE.sRGBEncoding;
-    const earthNormal = textureLoader.load(
-      baseUrl + 'assets/textures/EarthNormal1.png'
-    );
-    earthNormal.wrapS = earthNormal.wrapT = THREE.RepeatWrapping;
-
-    const grassTexture = textureLoader.load(
-      baseUrl + 'assets/textures/GrassBaseColor1.png'
-    );
-    grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
-    const grassNormal = textureLoader.load(
-      baseUrl + 'assets/textures/GrassNormal1.png'
-    )
-    grassNormal.wrapS = grassNormal.wrapT = THREE.RepeatWrapping */
+    const {geometry} = allocator;
 
     const lightMapper = procGenInstance.getLightMapper();
+    lightMapper.addEventListener('update', e => {
+      const {coord} = e.data;
+      material.uniforms.uLightBasePosition.value.copy(coord);
+      material.uniforms.uLightBasePosition.needsUpdate = true;
+    });
 
     const material = new THREE.MeshStandardMaterial({
       map: new THREE.Texture(),
-      normalMap: new THREE.Texture(),
-      emissiveMap: new THREE.Texture(),
+      // normalMap: new THREE.Texture(),
+      // emissiveMap: new THREE.Texture(),
       // normalScale: new THREE.Vector2(50, 50),
       // normalMapType: THREE.ObjectSpaceNormalMap,
-      bumpMap: new THREE.Texture(),
+      // bumpMap: new THREE.Texture(),
       // bumpScale: 1,
       // roughness: 1,
-      roughnessMap: new THREE.Texture(),
-      aoMap: new THREE.Texture(),
+      // roughnessMap: new THREE.Texture(),
+      // aoMap: new THREE.Texture(),
       // transparent: true,
       onBeforeCompile: (shader) => {
         for (const k in material.uniforms) {
@@ -351,60 +227,26 @@ uniform sampler2D Normal;
 uniform sampler2D Roughness;
 uniform sampler2D Ambient_Occlusion;
 uniform sampler2D Height;
-uniform sampler2D biomeUvDataTexture;
 uniform vec3 uLightBasePosition;
 uniform float uTerrainSize;
 flat varying ivec4 vBiomes;
 varying vec4 vBiomesWeights;
 varying vec3 vPosition;
 varying vec3 vWorldNormal;
-// varying vec3 vUvLight;
 varying float vLightValue;
 
-vec4 fourTapSample(
-  sampler2D atlas,
-  vec2 tileUV,
-  vec2 tileOffset,
-  vec2 tileSize
-) {
-  //Initialize accumulators
-  vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
-  float totalWeight = 0.0;
-
-  for (int dx=0; dx<2; ++dx) {
-    for (int dy=0; dy<2; ++dy) {
-      //Compute coordinate in 2x2 tile patch
-      vec2 tileCoord = 2.0 * fract(0.5 * (tileUV + vec2(dx,dy)));
-
-      //Weight sample based on distance to center
-      float w = pow(1.0 - max(abs(tileCoord.x-1.0), abs(tileCoord.y-1.0)), 16.0);
-
-      //Compute atlas coord
-      vec2 atlasUV = tileOffset + tileSize * tileCoord;
-
-      //Sample and accumulate
-      color += w * texture2D(atlas, atlasUV);
-      totalWeight += w;
-    }
-  }
-
-  return color / totalWeight;
-}
 vec4 triplanarMap(sampler2D Base_Color, vec3 position, vec3 normal) {
   // Triplanar mapping
   vec2 tx = position.yz;
   vec2 ty = position.zx;
   vec2 tz = position.xy;
 
-  vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
-  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
-
   vec3 bf = normalize(abs(normal));
   bf /= dot(bf, vec3(1.));
 
-  vec4 cx = fourTapSample(Base_Color, tx, tileOffset, tileSize) * bf.x;
-  vec4 cy = fourTapSample(Base_Color, ty, tileOffset, tileSize) * bf.y;
-  vec4 cz = fourTapSample(Base_Color, tz, tileOffset, tileSize) * bf.z;
+  vec4 cx = texture2D(Base_Color, tx) * bf.x;
+  vec4 cy = texture2D(Base_Color, ty) * bf.y;
+  vec4 cz = texture2D(Base_Color, tz) * bf.z;
   
   vec4 color = cx + cy + cz;
   return color;
@@ -419,15 +261,12 @@ vec4 triplanarMapDx(sampler2D Base_Color, vec3 position, vec3 normal) {
   vec2 tyDx = dFdx(ty);
   vec2 tzDx = dFdx(tz);
 
-  vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
-  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
-
   vec3 bf = normalize(abs(normal));
   bf /= dot(bf, vec3(1.));
 
-  vec4 cx = fourTapSample(Base_Color, tx + txDx, tileOffset, tileSize) * bf.x;
-  vec4 cy = fourTapSample(Base_Color, ty + tyDx, tileOffset, tileSize) * bf.y;
-  vec4 cz = fourTapSample(Base_Color, tz + tzDx, tileOffset, tileSize) * bf.z;
+  vec4 cx = texture2D(Base_Color, tx + txDx) * bf.x;
+  vec4 cy = texture2D(Base_Color, ty + tyDx) * bf.y;
+  vec4 cz = texture2D(Base_Color, tz + tzDx) * bf.z;
   
   vec4 color = cx + cy + cz;
   return color;
@@ -442,15 +281,12 @@ vec4 triplanarMapDy(sampler2D Base_Color, vec3 position, vec3 normal) {
   vec2 tyDy = dFdy(ty);
   vec2 tzDy = dFdy(tz);
 
-  vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
-  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
-
   vec3 bf = normalize(abs(normal));
   bf /= dot(bf, vec3(1.));
 
-  vec4 cx = fourTapSample(Base_Color, tx + txDy, tileOffset, tileSize) * bf.x;
-  vec4 cy = fourTapSample(Base_Color, ty + tyDy, tileOffset, tileSize) * bf.y;
-  vec4 cz = fourTapSample(Base_Color, tz + tzDy, tileOffset, tileSize) * bf.z;
+  vec4 cx = texture2D(Base_Color, tx + txDy) * bf.x;
+  vec4 cy = texture2D(Base_Color, ty + tyDy) * bf.y;
+  vec4 cz = texture2D(Base_Color, tz + tzDy) * bf.z;
   
   vec4 color = cx + cy + cz;
   return color;
@@ -462,15 +298,12 @@ vec4 triplanarNormal(sampler2D Normal, vec3 position, vec3 normal) {
   vec2 uvY = position.xz;
   vec2 uvZ = position.xy;
 
-  vec2 tileOffset = texture2D(biomeUvDataTexture, vec2((float(vBiomes.x) + 0.5) / 256., 0.5)).rg;
-  const vec2 tileSize = vec2(1. / ${texturesPerRow.toFixed(8)}) * 0.5;
-  
   vec3 bf = normalize(abs(normal));
   bf /= dot(bf, vec3(1.));
   
-  vec4 cx = fourTapSample(Normal, uvX, tileOffset, tileSize);
-  vec4 cy = fourTapSample(Normal, uvY, tileOffset, tileSize);
-  vec4 cz = fourTapSample(Normal, uvZ, tileOffset, tileSize);
+  vec4 cx = texture2D(Normal, uvX);
+  vec4 cy = texture2D(Normal, uvY);
+  vec4 cz = texture2D(Normal, uvZ);
 
   cx = cx * 2. - 1.;
   cy = cy * 2. - 1.;
@@ -609,9 +442,9 @@ float roughnessFactor = roughness;
         needsUpdate: true,
       };
       // texture atlas
-      for (const mapName of mapNames) {
-        uniforms[mapName] = {
-          value: atlasTextures[mapName],
+      for (const textureName of textureNames) {
+        uniforms[textureName] = {
+          value: textures[textureName],
           needsUpdate: true,
         };
       }
@@ -629,7 +462,7 @@ float roughnessFactor = roughness;
         needsUpdate: true,
       };
       uniforms.uTerrainSize = {
-        value: terrainSize, // XXX needs to be range-aware
+        value: terrainSize,
         needsUpdate: true,
       };
 
@@ -651,7 +484,7 @@ float roughnessFactor = roughness;
   }
   async getChunkRenderData(chunk, signal) {
     const meshData =
-      await this.procGenInstance.dcWorkerManager.generateChunkRenderable(
+      await this.procGenInstance.dcWorkerManager.generateLiquidChunk(
         chunk,
         chunk.lodArray,
         {
@@ -678,7 +511,7 @@ float roughnessFactor = roughness;
   drawChunk(chunk, renderData, signal) {
     if (renderData) {
       // non-empty chunk
-      const { meshData, geometryBuffer } = renderData;
+      const { meshData } = renderData;
 
       const _mapOffsettedIndices = (
         srcIndices,
@@ -698,9 +531,7 @@ float roughnessFactor = roughness;
       ) => {
         let positionOffset = geometryBinding.getAttributeOffset('position');
         let normalOffset = geometryBinding.getAttributeOffset('normal');
-        let biomesOffset = geometryBinding.getAttributeOffset('biomes');
-        let biomesWeightsOffset =
-          geometryBinding.getAttributeOffset('biomesWeights');
+        let biomeOffset = geometryBinding.getAttributeOffset('biome');
         let indexOffset = geometryBinding.getIndexOffset();
 
         _mapOffsettedIndices(
@@ -722,16 +553,10 @@ float roughnessFactor = roughness;
           meshData.normals,
           0
         );
-        geometry.attributes.biomes.update(
-          biomesOffset,
+        geometry.attributes.biome.update(
+          biomeOffset,
           meshData.biomes.length,
           meshData.biomes,
-          0
-        );
-        geometry.attributes.biomesWeights.update(
-          biomesWeightsOffset,
-          meshData.biomesWeights.length,
-          meshData.biomesWeights,
           0
         );
         geometry.index.update(indexOffset, meshData.indices.length);
@@ -762,9 +587,7 @@ float roughnessFactor = roughness;
       };
       _handleMesh();
 
-      this.lightMapper.drawChunk(chunk, meshData);
-
-      const _handlePhysics = async () => {
+      /* const _handlePhysics = async () => {
         this.matrixWorld.decompose(localVector, localQuaternion, localVector2);
         const physicsObject = this.physics.addCookedGeometry(
           geometryBuffer,
@@ -784,10 +607,14 @@ float roughnessFactor = roughness;
           );
         });
       };
-      _handlePhysics();
+      _handlePhysics(); */
     }
   }
   updateCoord(min2xCoord) {
+    // XXX only do this on light mapper update
+    // XXX needs to apply to the terrain mesh too, though the terrain mesh is driving the lighting (maybe rethink this)
+    // XXX create a new lighting app which tracks the lighting only
+    // XXX maybe do the same for hte heightfield?
     if (this.lightMapper.updateCoord(min2xCoord)) {
       this.material.uniforms.uLightBasePosition.value.copy(
         this.lightMapper.lightBasePosition
@@ -797,44 +624,44 @@ float roughnessFactor = roughness;
   }
 }
 
-class TerrainChunkGenerator {
+class WaterChunkGenerator {
   constructor({
     procGenInstance,
     physics,
-    biomeUvDataTexture,
-    atlasTextures,
+    // biomeUvDataTexture,
+    textures,
   } = {}) {
     // parameters
     this.procGenInstance = procGenInstance;
     this.physics = physics;
-    this.biomeUvDataTexture = biomeUvDataTexture;
-    this.atlasTextures = atlasTextures;
+    // this.biomeUvDataTexture = biomeUvDataTexture;
+    this.textures = textures;
 
     // mesh
     this.object = new THREE.Group();
-    this.object.name = 'terrain-chunk-generator';
+    this.object.name = 'water';
 
-    this.terrainMesh = new TerrainMesh({
+    this.waterMesh = new WaterMesh({
       procGenInstance: this.procGenInstance,
       physics: this.physics,
-      biomeUvDataTexture: this.biomeUvDataTexture,
-      atlasTextures: this.atlasTextures,
+      // biomeUvDataTexture: this.biomeUvDataTexture,
+      textures: this.textures,
     });
-    this.object.add(this.terrainMesh);
+    this.object.add(this.waterMesh);
   }
 
   getMeshes() {
     return this.object.children;
   }
   getPhysicsObjects() {
-    return this.terrainMesh.physicsObjects;
+    return this.waterMesh.physicsObjects;
   }
 
   async generateChunk(chunk) {
     const signal = this.bindChunk(chunk);
 
     try {
-      await this.terrainMesh.addChunk(chunk, {
+      await this.waterMesh.addChunk(chunk, {
         signal,
       });
     } catch (err) {
@@ -852,34 +679,32 @@ class TerrainChunkGenerator {
       chunk.binding = null;
     }
   }
-  relodChunk(oldChunk, newChunk) {
+  async relodChunk(oldChunk, newChunk) {
     // console.log('relod chunk', oldChunk, newChunk);
 
-    (async () => {
-      try {
-        const oldAbortController = oldChunk.binding.abortController;
-        const newSignal = this.bindChunk(newChunk);
+    try {
+      const oldAbortController = oldChunk.binding.abortController;
+      const newSignal = this.bindChunk(newChunk);
 
-        const abortOldChunk = (e) => {
-          oldAbortController.abort(abortError);
-        };
-        newSignal.addEventListener('abort', abortOldChunk);
+      const abortOldChunk = (e) => {
+        oldAbortController.abort(abortError);
+      };
+      newSignal.addEventListener('abort', abortOldChunk);
 
-        const renderData = await this.terrainMesh.getChunkRenderData(
-          newChunk,
-          newSignal
-        );
+      const renderData = await this.waterMesh.getChunkRenderData(
+        newChunk,
+        newSignal
+      );
 
-        newSignal.removeEventListener('abort', abortOldChunk);
+      newSignal.removeEventListener('abort', abortOldChunk);
 
-        this.disposeChunk(oldChunk);
-        this.terrainMesh.drawChunk(newChunk, renderData, newSignal);
-      } catch (err) {
-        if (err !== abortError) {
-          console.warn(err);
-        }
+      this.disposeChunk(oldChunk);
+      this.waterMesh.drawChunk(newChunk, renderData, newSignal);
+    } catch (err) {
+      if (err !== abortError) {
+        console.warn(err);
       }
-    })();
+    }
   }
 
   bindChunk(chunk) {
@@ -891,71 +716,6 @@ class TerrainChunkGenerator {
     };
 
     return signal;
-  }
-
-  async hit(e, tracker) {
-    const { LodChunk } = useLodder();
-
-    // perform damage
-    const hitPosition = localVector
-      .copy(e.hitPosition)
-      .applyMatrix4(localMatrix.copy(this.terrainMesh.matrixWorld).invert());
-    const chunks = await this.procGenInstance.dcWorkerManager.drawSphereDamage(
-      hitPosition,
-      3
-    );
-    if (chunks) {
-      // generate the new chunks
-      let meshSpecs = await Promise.all(
-        chunks.map(async (chunkSpec) => {
-          const lodArray = Array(8).fill(1);
-          const chunk = new LodChunk(
-            chunkSpec.position[0],
-            chunkSpec.position[1],
-            chunkSpec.position[2],
-            lodArray
-          ).divideScalar(chunkWorldSize);
-          const signal = this.bindChunk(chunk);
-          const renderData = await this.terrainMesh.getChunkRenderData(
-            chunk,
-            signal
-          );
-          if (renderData) {
-            return {
-              chunk,
-              renderData,
-              signal,
-            };
-          } else {
-            return null;
-          }
-        })
-      );
-      meshSpecs = meshSpecs.filter((m) => m !== null);
-      // remove old chunks
-      tracker.chunks = tracker.chunks.filter((chunk) => {
-        if (
-          !meshSpecs.some((meshSpec) => {
-            return meshSpec.chunk.equals(chunk);
-          })
-        ) {
-          // not being replaced
-          return true;
-        } else {
-          // being replaced
-          this.disposeChunk(chunk);
-          return false;
-        }
-      });
-      // add new chunks
-      for (const meshSpec of meshSpecs) {
-        const { chunk, signal, renderData } = meshSpec;
-        this.terrainMesh.drawChunk(chunk, renderData, signal);
-        tracker.chunks.push(chunk);
-      }
-    } else {
-      console.log('no update');
-    }
   }
 
   update(timestamp, timeDiff) {
@@ -971,6 +731,7 @@ class TerrainChunkGenerator {
 
 export default (e) => {
   const app = useApp();
+
   const physics = usePhysics();
   const procGenManager = useProcGenManager();
 
@@ -984,14 +745,35 @@ export default (e) => {
     );
   }
 
-  app.name = 'dual-contouring-terrain';
+  app.name = 'water';
 
   let live = true;
   let generator = null;
   let tracker = null;
   e.waitUntil(
     (async () => {
-      // this small texture maps biome indexes in the geometry to biome uvs in the atlas texture
+      const texturesArray = await Promise.all(textureNames.map(async k => {
+        const u = textureUrls[k];
+        const img = new Image();
+        await new Promise((accept, reject) => {
+          img.onload = () => {
+            accept();
+          };
+          img.onerror = reject;
+          img.crossOrigin = 'Anonymous';
+          img.src = u;
+        });
+        const texture = new THREE.Texture(img);
+        return texture;
+      }));
+      if (!live) return;
+
+      const textures = {};
+      for (let i = 0; i < textureNames.length; i++) {
+        textures[textureNames[i]] = texturesArray[i];
+      }
+        
+      /* // this small texture maps biome indexes in the geometry to biome uvs in the atlas texture
       const biomeUvDataTexture = (() => {
         const data = new Uint8Array(256 * 4);
         for (let i = 0; i < biomeSpecs.length; i++) {
@@ -1016,60 +798,26 @@ export default (e) => {
         texture.magFilter = THREE.NearestFilter;
         texture.needsUpdate = true;
         return texture;
-      })();
-
-      const { ktx2Loader } = useLoaders();
-      const atlasTexturesArray = await Promise.all(
-        mapNames.map(
-          (mapName) =>
-            new Promise((accept, reject) => {
-              ktx2Loader.load(
-                `${biomesKtx2TexturePrefix}build/8k/${mapName}.ktx2`,
-                accept,
-                function onprogress(e) {},
-                reject
-              );
-            })
-        )
-      );
-      if (!live) return;
-
-      const atlasTextures = {};
-      for (let i = 0; i < mapNames.length; i++) {
-        // atlasTexturesArray[i].needsUpdate = true;
-        // atlasTexturesArray[i].wrapS = THREE.RepeatWrapping;
-        // atlasTexturesArray[i].wrapT = THREE.RepeatWrapping;
-        const compressedTexture = atlasTexturesArray[i];
-        // compressedTexture.encoding = (mapNames === 'Base_Color' || mapNames === 'Emissive') ? THREE.sRGBEncoding : THREE.LinearEncoding;
-        compressedTexture.anisotropy = 16;
-        // compressedTexture.premultiplyAlpha = true;
-        atlasTextures[mapNames[i]] = compressedTexture;
-      }
+      })(); */
 
       const procGenInstance = procGenManager.getInstance(seed, range);
 
-      generator = new TerrainChunkGenerator({
+      generator = new WaterChunkGenerator({
         procGenInstance,
         physics,
-        biomeUvDataTexture,
-        atlasTextures,
+        // biomeUvDataTexture,
+        textures,
       });
       tracker = procGenInstance.getChunkTracker({
         numLods,
         trackY: true,
         relod: true,
       });
-      // tracker.name = 'terrain';
-      /* tracker = new LodChunkTracker(generator, {
-      chunkWorldSize,
-      numLods,
-      chunkHeight: chunkWorldSize,
-    }); */
+
       tracker.addEventListener('coordupdate', coordupdate);
       tracker.addEventListener('chunkadd', chunkadd);
       tracker.addEventListener('chunkremove', chunkremove);
       tracker.addEventListener('chunkrelod', chunkrelod);
-      // tracker.emitEvents(chunkadd);
 
       if (wait) {
         await new Promise((accept, reject) => {
@@ -1086,16 +834,11 @@ export default (e) => {
     })()
   );
 
-  app.getPhysicsObjects = () =>
-    generator ? generator.getPhysicsObjects() : [];
-
-  app.addEventListener('hit', (e) => {
-    generator && tracker && generator.hit(e, tracker);
-  });
+  // app.getPhysicsObjects = () => generator ? generator.getPhysicsObjects() : [];
 
   const coordupdate = (e) => {
     const {coord} = e.data;
-    generator.terrainMesh.updateCoord(coord);
+    generator.waterMesh.updateCoord(coord);
   };
   const chunkadd = (e) => {
     const {chunk, waitUntil} = e.data;
