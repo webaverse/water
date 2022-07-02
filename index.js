@@ -106,7 +106,9 @@ class WaterMesh extends BatchedMesh {
     );
     const {geometry} = allocator;
 
-    const lightMapper = procGenInstance.getLightMapper();
+    const lightMapper = procGenInstance.getLightMapper({
+      // debug: true,
+    });
     lightMapper.addEventListener('update', e => {
       const {coord} = e.data;
       material.uniforms.uLightBasePosition.value.copy(coord);
