@@ -677,26 +677,30 @@ class WaterChunkGenerator {
       chunk.binding = null;
     }
   }
-  async relodChunk(oldChunk, newChunk) {
+  async relodChunk(oldChunks, newChunk) {
     // console.log('relod chunk', oldChunk, newChunk);
 
     try {
-      const oldAbortController = oldChunk.binding.abortController;
+      const oldAbortControllers = oldChunks.map(oldChunk => oldChunk.binding.abortController);
       const newSignal = this.bindChunk(newChunk);
 
-      const abortOldChunk = (e) => {
-        oldAbortController.abort(abortError);
+      const abortOldChunks = e => {
+        for (const oldAbortController of oldAbortControllers) {
+          oldAbortController.abort(abortError);
+        }
       };
-      newSignal.addEventListener('abort', abortOldChunk);
+      newSignal.addEventListener('abort', abortOldChunks);
 
       const renderData = await this.waterMesh.getChunkRenderData(
         newChunk,
         newSignal
       );
 
-      newSignal.removeEventListener('abort', abortOldChunk);
+      newSignal.removeEventListener('abort', abortOldChunks);
 
-      this.disposeChunk(oldChunk);
+      for (const oldChunk of oldChunks) {
+        this.disposeChunk(oldChunk);
+      }
       this.waterMesh.drawChunk(newChunk, renderData, newSignal);
     } catch (err) {
       if (err !== abortError) {
@@ -848,8 +852,8 @@ export default (e) => {
     generator.disposeChunk(chunk);
   };
   const chunkrelod = (e) => {
-    const {oldChunk, newChunk} = e.data;
-    generator.relodChunk(oldChunk, newChunk);
+    const {oldChunks, newChunk} = e.data;
+    generator.relodChunk(oldChunks, newChunk);
   };
 
   useFrame(() => {
