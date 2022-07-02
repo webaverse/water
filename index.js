@@ -402,8 +402,9 @@ float roughnessFactor = roughness;
         `);
         shader.fragmentShader = shader.fragmentShader.replace(`#include <map_fragment>`, `\
 #ifdef USE_MAP
-  vec4 sampledDiffuseColor = triplanarMap(Base_Color, vPosition, vWorldNormal);
+  // vec4 sampledDiffuseColor = triplanarMap(Base_Color, vPosition, vWorldNormal);
   // sampledDiffuseColor.a = 1.;
+  vec4 sampledDiffuseColor = vec4(0., 0., 1., 1.);
   #ifdef DECODE_VIDEO_TEXTURE
     // inline sRGB decode (TODO: Remove this code when https://crbug.com/1256340 is solved)
     sampledDiffuseColor = vec4( mix( pow( sampledDiffuseColor.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), sampledDiffuseColor.rgb * 0.0773993808, vec3( lessThanEqual( sampledDiffuseColor.rgb, vec3( 0.04045 ) ) ) ), sampledDiffuseColor.w );
