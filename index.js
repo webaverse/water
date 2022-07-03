@@ -678,8 +678,43 @@ class WaterChunkGenerator {
       chunk.binding = null;
     }
   }
-  async relodChunk(oldChunks, newChunk) {
+  async relodChunks(oldChunks, newChunk) {
     // console.log('relod chunk', oldChunk, newChunk);
+
+    try {
+      const oldAbortControllers = oldChunks.map(oldChunk => {
+        return oldChunk.binding.abortController;
+      });
+      // const oldAbortController = oldChunk.binding.abortController;
+      const newSignal = this.bindChunk(newChunk);
+
+      const abortOldChunks = e => {
+        for (const oldAbortController of oldAbortControllers) {
+          oldAbortController.abort(abortError);
+        }
+      };
+      newSignal.addEventListener('abort', abortOldChunks);
+
+      const renderData = await this.waterMesh.getChunkRenderData(
+        newChunk,
+        newSignal
+      );
+
+      newSignal.removeEventListener('abort', abortOldChunks);
+
+      for (const oldChunk of oldChunks) {
+        this.disposeChunk(oldChunk);
+      }
+      this.waterMesh.drawChunk(newChunk, renderData, newSignal);
+    } catch (err) {
+      if (!err?.isAbortError) {
+        console.warn(err);
+      }
+    }
+  }
+  /* async relodChunk(oldChunks, newChunk) {
+    // console.log('relod chunk', oldChunk, newChunk);
+    // return;
 
     try {
       const oldAbortControllers = oldChunks.map(oldChunk => oldChunk.binding.abortController);
@@ -704,11 +739,11 @@ class WaterChunkGenerator {
       }
       this.waterMesh.drawChunk(newChunk, renderData, newSignal);
     } catch (err) {
-      if (err !== abortError) {
+      if (!err?.isAbortError) {
         console.warn(err);
       }
     }
-  }
+  } */
 
   bindChunk(chunk) {
     const abortController = new AbortController();
@@ -854,7 +889,7 @@ export default (e) => {
   };
   const chunkrelod = (e) => {
     const {oldChunks, newChunk} = e.data;
-    generator.relodChunk(oldChunks, newChunk);
+    generator.relodChunks(oldChunks, newChunk);
   };
 
   useFrame(() => {
