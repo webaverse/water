@@ -192,6 +192,9 @@ class WaterMesh extends BatchedMesh {
           sunPosition: {
               value: new THREE.Vector3(200.0, 1.0, -600.)
           },
+          sunDirection: {
+              value: new THREE.Vector3(200.0, 1.0, -600.)
+          },
           playerPosition: {
               value: new THREE.Vector3()
           },
@@ -207,6 +210,12 @@ class WaterMesh extends BatchedMesh {
           flowmapTexture: {
               value: flowmapTexture
           },
+          waterNormalTexture1:{
+            value: waterNormalTexture1
+          },
+          waterNormalTexture2:{
+            value: waterNormalTexture2
+          }
 
       },
       vertexShader: `\
@@ -217,16 +226,14 @@ class WaterMesh extends BatchedMesh {
 
           varying vec3 vPos;
           varying vec2 vUv;
+          uniform sampler2D waterNormalTexture1;
+          uniform sampler2D waterNormalTexture2;
           
           void main() {
               vPos = position;
               vUv = uv;
               vec3 pos = position;
               vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
-            //   float elevation = sin(modelPosition.x * 0.2 + uTime * 0.75) *
-            //       sin(modelPosition.z * 0.5 + uTime * 0.75) *
-            //       0.2;
-            //   modelPosition.y += elevation;
               vec4 viewPosition = viewMatrix * modelPosition;
               vec4 projectionPosition = projectionMatrix * viewPosition;
       
@@ -253,73 +260,120 @@ class WaterMesh extends BatchedMesh {
           uniform vec3 sunPosition;
           uniform vec3 playerPosition;
           uniform vec3 playerDirection;
+          uniform vec3 sunDirection;
+          
 
           
-          uniform sampler2D waterDerivativeHeightTexture;
-          uniform sampler2D waterNoiseTexture;
-          uniform sampler2D flowmapTexture;
+        //   uniform sampler2D waterDerivativeHeightTexture;
+        //   uniform sampler2D waterNoiseTexture;
+        //   uniform sampler2D flowmapTexture;
+          uniform sampler2D waterNormalTexture1;
+          uniform sampler2D waterNormalTexture2;
 
-          
-          float frac(float v)
-          {
-            return v - floor(v);
-          }
-          vec3 FlowUVW (vec2 uv, vec2 flowVector, vec2 jump, float flowOffset, float tiling, float time,  bool flowB) {
-              float phaseOffset = flowB ? 0.5 : 0.;
-              float progress = frac(time + phaseOffset);
-            vec3 uvw;
-              uvw.xy = uv - flowVector * (progress + flowOffset);
-              uvw.xy *= tiling;
-              uvw.xy += phaseOffset;
-              uvw.xy += (time - progress) * jump;
-              uvw.z = 1. - abs(1. - 2. * progress);
-              return uvw;
-          }
-          vec3 UnpackDerivativeHeight (vec4 textureData) {
-              vec3 dh = textureData.agb;
-              dh.xy = dh.xy * 2. - 1.;
-              return dh;
-          }
+        vec4 getNoise( vec2 uv ) {
+            vec2 uv0 = ( uv / 103.0 ) + vec2(uTime / 34.0, uTime / 58.0);
+            vec2 uv1 = uv / 107.0-vec2( uTime / -38.0, uTime / 64.0 );
+            vec2 uv2 = uv / vec2( 8907.0, 9803.0 ) + vec2( uTime / 202.0, uTime / 194.0 );
+            vec2 uv3 = uv / vec2( 1091.0, 1027.0 ) - vec2( uTime / 218.0, uTime / -226.0 );
+            vec4 noise = texture2D( waterNormalTexture1, uv0 ) +
+                texture2D( waterNormalTexture1, uv1 ) +
+                texture2D( waterNormalTexture2, uv2 ) +
+                texture2D( waterNormalTexture2, uv3 );
+            return noise * 0.5 - 1.0;
+        }
+        void sunLight( const vec3 surfaceNormal, const vec3 eyeDirection, float shiny, float spec, float diffuse, inout vec3 diffuseColor, inout vec3 specularColor ) {
+            vec3 reflection = normalize( reflect( -sunDirection, surfaceNormal ) );
+            float direction = max( 0.0, dot( eyeDirection, reflection ) );
+            specularColor += pow( direction, shiny ) * vec3(0.3, 0.3, 0.3) * spec;
+            diffuseColor += max( dot( sunDirection, surfaceNormal ), 0.0 ) * vec3(0.3, 0.3, 0.3) * diffuse;
+        }
   
           float shineDamper = 30.;
           float reflectivity = 1.5;
           void main() {
-             
-              vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
-              vec3 sunToPlayer = normalize(sunPosition - playerPosition); 
-              vec3 worldToEye = vec3(playerPosition.x + sunToPlayer.x * 100., playerPosition.y, playerPosition.z + sunToPlayer.z * 100.)-worldPosition.xyz;
-              
-            //   vec3 eyeDirection = normalize( worldToEye );
-              vec3 eyeDirection = normalize(worldPosition.xyz - cameraPosition);
-              vec2 uv = worldPosition.xz * 0.05;
+            vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
+            vec4 noise = getNoise( worldPosition.xz * 2.);
+            vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
 
-              vec2 flowmap = texture2D(flowmapTexture, uv / 5.).rg * 2. - 1.;
-              flowmap *= uFlowStrength;
-              float noise = texture2D(flowmapTexture, uv).a;
-              float time = uTime * uSpeed + noise;
-              vec2 jump = vec2(uUJump, uVJump);
-              vec3 uvwA = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, false);
-              vec3 uvwB = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, true);
+            vec3 diffuseLight = vec3(1.0);
+            vec3 specularLight = vec3(0.1, 0.6, 0.6);
+            vec3 worldToEye = worldPosition.xyz - cameraPosition;
+            vec3 eyeDirection = normalize( worldToEye );
+            sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );
+            float distance = length(worldToEye);
+            // vec2 distortion = surfaceNormal.xz * ( 0.001 + 1.0 / distance ) * distortionScale;
 
-              vec3 dhA = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwA.xy * 1.)) * uvwA.z * 20.5;
-              vec3 dhB = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwB.xy * 1.)) * uvwB.z * 20.5;
-              vec3 surfaceNormal = normalize(vec3(-(dhA.xy + dhB.xy), 1.));
-
-              vec3 fromSunVector = worldPosition.xyz - (sunPosition );
-              vec3 reflectedLight = reflect(normalize(fromSunVector), surfaceNormal);
-              float specular = max(dot(reflectedLight, eyeDirection), 0.0);
-              specular = pow(specular, shineDamper);
-              vec3 specularHighlight = vec3(0.9, 0.9, 0.9) * specular * reflectivity;
-                 
-              vec4 texA = texture2D(waterNoiseTexture, uvwA.xy) * uvwA.z;
-              vec4 texB = texture2D(waterNoiseTexture, uvwB.xy) * uvwB.z;
-
-              gl_FragColor = (texA + texB) * vec4(0.048, 0.24, 0.384, 0.97) + vec4(0.0282, 0.470, 0.431, 0.);
-              gl_FragColor.rgb /= 3.;
-              gl_FragColor += vec4( specularHighlight, 0.0 );
+            float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
+            float rf0 = 0.3;
+            float reflectance = rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 );
+            vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * vec3(1.0, 1.0, 1.0);
+            vec3 albedo = ( vec3(0.3, 0.3, 0.3) * diffuseLight * 0.025 + scatter );
+            vec3 outgoingLight = albedo;
+            gl_FragColor = (vec4( outgoingLight, 0.95 ) * vec4(0.048, 0.3, 0.384, 1.0)) + + vec4(0.0282, 0.470, 0.431, 0.);
+            
  
               ${THREE.ShaderChunk.logdepthbuf_fragment}
           }
+
+          
+        //   float frac(float v)
+        //   {
+        //     return v - floor(v);
+        //   }
+        //   vec3 FlowUVW (vec2 uv, vec2 flowVector, vec2 jump, float flowOffset, float tiling, float time,  bool flowB) {
+        //       float phaseOffset = flowB ? 0.5 : 0.;
+        //       float progress = frac(time + phaseOffset);
+        //     vec3 uvw;
+        //       uvw.xy = uv - flowVector * (progress + flowOffset);
+        //       uvw.xy *= tiling;
+        //       uvw.xy += phaseOffset;
+        //       uvw.xy += (time - progress) * jump;
+        //       uvw.z = 1. - abs(1. - 2. * progress);
+        //       return uvw;
+        //   }
+        //   vec3 UnpackDerivativeHeight (vec4 textureData) {
+        //       vec3 dh = textureData.agb;
+        //       dh.xy = dh.xy * 2. - 1.;
+        //       return dh;
+        //   }
+  
+        //   float shineDamper = 30.;
+        //   float reflectivity = 1.5;
+        //   void main() {
+             
+        //       vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
+        //       vec3 sunToPlayer = normalize(sunPosition - playerPosition); 
+        //       vec3 worldToEye = vec3(playerPosition.x + sunToPlayer.x * 100., playerPosition.y, playerPosition.z + sunToPlayer.z * 100.)-worldPosition.xyz;
+              
+        //     //   vec3 eyeDirection = normalize( worldToEye );
+        //       vec3 eyeDirection = normalize(worldPosition.xyz - cameraPosition);
+        //       vec2 uv = worldPosition.xz * 0.05;
+
+        //       vec2 flowmap = texture2D(flowmapTexture, uv / 5.).rg * 2. - 1.;
+        //       flowmap *= uFlowStrength;
+        //       float noise = texture2D(flowmapTexture, uv).a;
+        //       float time = uTime * uSpeed + noise;
+        //       vec2 jump = vec2(uUJump, uVJump);
+        //       vec3 uvwA = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, false);
+        //       vec3 uvwB = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, true);
+
+        //       vec3 dhA = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwA.xy * 1.)) * uvwA.z * 20.5;
+        //       vec3 dhB = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwB.xy * 1.)) * uvwB.z * 20.5;
+        //       vec3 surfaceNormal = normalize(vec3(-(dhA.xy + dhB.xy), 1.));
+
+        //       vec3 fromSunVector = worldPosition.xyz - (sunPosition );
+        //       vec3 reflectedLight = reflect(normalize(fromSunVector), surfaceNormal);
+        //       float specular = max(dot(reflectedLight, eyeDirection), 0.0);
+        //       specular = pow(specular, shineDamper);
+        //       vec3 specularHighlight = vec3(0.9, 0.9, 0.9) * specular * reflectivity;
+                 
+        //       vec4 texA = texture2D(waterNoiseTexture, uvwA.xy) * uvwA.z;
+        //       vec4 texB = texture2D(waterNoiseTexture, uvwB.xy) * uvwB.z;
+
+        //       gl_FragColor = (texA + texB) * vec4(0.048, 0.24, 0.384, 0.9) + vec4(0.0282, 0.470, 0.431, 0.);
+        //       gl_FragColor.rgb /= 3.;
+        //       gl_FragColor += vec4( specularHighlight, 0.0 );
+        //   }
       `,
       side: THREE.DoubleSide,
       transparent: true,
@@ -788,7 +842,12 @@ export default (e) => {
 
     let alreadySetComposer = false;
     
-    
+    const geometry = new THREE.PlaneGeometry( 3, 3);
+    const material = new THREE.MeshBasicMaterial( { color: 0xffff00, transparent: true, opacity: 0.1, side: THREE.DoubleSide } );
+    const sphere = new THREE.Mesh( geometry, material );
+    app.add( sphere );
+    sphere.position.y = 63;
+    app.updateMatrixWorld();
     
     useFrame(({timestamp, timeDiff}) => {
       if (!!tracker && !range) {
@@ -4557,7 +4616,8 @@ export default (e) => {
                 scalesAttribute.setX(i,scalesAttribute.getX(i) + 0.04);
                 if(brokenAttribute.getX(i) < 1)
                     brokenAttribute.setX(i, brokenAttribute.getX(i) + 0.007);
-                
+                else
+                    scalesAttribute.setX(i,0);
 
             }
             
