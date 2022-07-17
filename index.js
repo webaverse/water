@@ -842,12 +842,6 @@ export default (e) => {
 
     let alreadySetComposer = false;
     
-    const geometry = new THREE.PlaneGeometry( 3, 3);
-    const material = new THREE.MeshBasicMaterial( { color: 0xffff00, transparent: true, opacity: 0.1, side: THREE.DoubleSide } );
-    const sphere = new THREE.Mesh( geometry, material );
-    app.add( sphere );
-    sphere.position.y = 63;
-    app.updateMatrixWorld();
     
     useFrame(({timestamp, timeDiff}) => {
       if (!!tracker && !range) {
