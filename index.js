@@ -93,11 +93,11 @@ class WaterMesh extends BatchedMesh {
           Type: Float32Array,
           itemSize: 3,
         },
-        {
+        /* {
           name: 'biome',
           Type: Int32Array,
           itemSize: 1,
-        },
+        }, */
       ],
       {
         bufferSize,
@@ -146,12 +146,12 @@ class WaterMesh extends BatchedMesh {
 
 precision highp sampler3D;
 
-attribute int biome;
+// attribute int biome;
 uniform vec3 uLightBasePosition;
 uniform float uTerrainSize;
 uniform sampler3D uSkylightTex;
 uniform sampler3D uAoTex;
-flat varying int vBiome;
+// flat varying int vBiome;
 varying vec3 vPosition;
 varying vec3 vWorldNormal;
 varying float vLightValue;
@@ -169,7 +169,7 @@ varying float vLightValue;
 // varyings
 {
   vWorldNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
-  vBiome = biome;
+  // vBiome = biome;
 }
 
 // lighting
@@ -228,7 +228,7 @@ uniform sampler2D Ambient_Occlusion;
 uniform sampler2D Height;
 uniform vec3 uLightBasePosition;
 uniform float uTerrainSize;
-flat varying int vBiome;
+// flat varying int vBiome;
 varying vec3 vPosition;
 varying vec3 vWorldNormal;
 varying float vLightValue;
@@ -530,7 +530,7 @@ float roughnessFactor = roughness;
       ) => {
         let positionOffset = geometryBinding.getAttributeOffset('position');
         let normalOffset = geometryBinding.getAttributeOffset('normal');
-        let biomeOffset = geometryBinding.getAttributeOffset('biome');
+        // let biomeOffset = geometryBinding.getAttributeOffset('biome');
         let indexOffset = geometryBinding.getIndexOffset();
 
         _mapOffsettedIndices(
@@ -552,12 +552,12 @@ float roughnessFactor = roughness;
           meshData.normals,
           0
         );
-        geometry.attributes.biome.update(
+        /* geometry.attributes.biome.update(
           biomeOffset,
           meshData.biomes.length,
           meshData.biomes,
           0
-        );
+        ); */
         geometry.index.update(indexOffset, meshData.indices.length);
       };
       const _handleMesh = () => {
