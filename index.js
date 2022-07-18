@@ -18,7 +18,7 @@ const {
   useProcGenManager,
   useInternals,
   useRenderSettings,
-  useSound
+  useSound,
   // useLodder,
 } = metaversefile;
 
@@ -32,8 +32,8 @@ const textureLoader = new THREE.TextureLoader();
 const bubbleTexture1 = textureLoader.load(`${baseUrl}/textures/Bubble3.png`);
 const bubbleTexture2 = textureLoader.load(`${baseUrl}/textures/Bubble2.png`);
 const noiseCircleTexture = textureLoader.load(`${baseUrl}/textures/noiseCircle.png`);
-const noiseTexture = textureLoader.load(`${baseUrl}/textures/perlin-noise.jpg`);
-const noiseTexture2 = textureLoader.load(`${baseUrl}/textures/noise.jpg`);
+// const noiseTexture = textureLoader.load(`${baseUrl}/textures/perlin-noise.jpg`);
+// const noiseTexture2 = textureLoader.load(`${baseUrl}/textures/noise.jpg`);
 const voronoiNoiseTexture = textureLoader.load(`${baseUrl}/textures/voronoiNoise.jpg`);
 voronoiNoiseTexture.wrapS = voronoiNoiseTexture.wrapT = THREE.RepeatWrapping;
 const noiseMap = textureLoader.load(`${baseUrl}/textures/noise.jpg`);
@@ -46,7 +46,7 @@ const noiseMap3 = textureLoader.load(`${baseUrl}/textures/noise3.png`);
 const maskTexture = textureLoader.load(`${baseUrl}/textures/mask.png`);
 const splashTexture = textureLoader.load(`${baseUrl}/textures/splash1.png`);
 const splashTexture2 = textureLoader.load(`${baseUrl}/textures/splash2.png`);
-const splashTexture4 = textureLoader.load(`${baseUrl}/textures/splash.png`);
+// const splashTexture4 = textureLoader.load(`${baseUrl}/textures/splash.png`);
 const rippleTexture = textureLoader.load(`${baseUrl}/textures/ripple3.png`);
 rippleTexture.wrapS = rippleTexture.wrapT = THREE.RepeatWrapping;
 const rippleTexture2 = textureLoader.load(`${baseUrl}/textures/ripple2.png`);
