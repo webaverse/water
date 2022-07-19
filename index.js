@@ -545,6 +545,8 @@ class WaterMesh extends BatchedMesh {
               this.physicsObjects.indexOf(physicsObject),
               1
             );
+
+            tracker.removeEventListener('chunkremove', onchunkremove);
           }
         };
         tracker.addEventListener('chunkremove', onchunkremove);
