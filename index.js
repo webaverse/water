@@ -752,8 +752,8 @@ export default (e) => {
   const debug = app.getComponent('debug') ?? false;
   let water = null;
   let waterPhysicsId = null;
-  const waterSurfacePos = new THREE.Vector3(0, 70, 0);
-  const cameraWaterSurfacePos = new THREE.Vector3(0, 70, 0);
+  const waterSurfacePos = new THREE.Vector3(0, 63, 0);
+  const cameraWaterSurfacePos = new THREE.Vector3(0, 63, 0);
   let contactWater = false;
   //let wholeBelowwWater = false;
   let floatOnWater = false;
@@ -995,7 +995,7 @@ export default (e) => {
                             waterSurfacePos.set(result3.point[0], result3.point[1], result3.point[2]);
                             playerIsOnSurface = true;
                             if(!playerHighestWaterSurface)
-                                playerHighestWaterSurface = waterSurfacePos.y;
+                                playerHighestWaterSurface = result3.point[1];
                             else
                                 playerHighestWaterSurface = playerHighestWaterSurface < waterSurfacePos.y ? waterSurfacePos.y : playerHighestWaterSurface;
                         }
@@ -1015,7 +1015,7 @@ export default (e) => {
                             cameraWaterSurfacePos.set(result4.point[0], result4.point[1], result4.point[2]);
                             cameraIsOnSurface = true;
                             if(!cameraHighestWaterSurface)
-                                cameraHighestWaterSurface = cameraWaterSurfacePos.y;
+                                cameraHighestWaterSurface = result4.point[1];
                             else
                                 cameraHighestWaterSurface = cameraHighestWaterSurface < cameraWaterSurfacePos.y ? cameraWaterSurfacePos.y : cameraHighestWaterSurface;
                         }
@@ -1060,7 +1060,7 @@ export default (e) => {
                                     testContact1 = false;
                                 }
                                 else{
-                                    let maxCheck = 2;
+                                    let maxCheck = 5;
                                     let physicsList = [];
                                     for(let i = 0; i < maxCheck; i++){
                                         if(result.distance <= ds){
@@ -1114,7 +1114,7 @@ export default (e) => {
                                     testContact2 = false;
                                 }
                                 else{
-                                    let maxCheck = 2;
+                                    let maxCheck = 5;
                                     let physicsList = [];
                                     for(let i = 0; i < maxCheck; i++){
                                         if(result.distance <= ds){
