@@ -73,6 +73,8 @@ const localVector = new THREE.Vector3();
 const localVector2 = new THREE.Vector3();
 // const localVector3 = new THREE.Vector3();
 // const localVector4 = new THREE.Vector3();
+const localVector3D = new THREE.Vector3();
+const localVector3D2 = new THREE.Vector3();
 const localQuaternion = new THREE.Quaternion();
 const localMatrix = new THREE.Matrix4();
 const localMatrix2 = new THREE.Matrix4();
@@ -90,7 +92,7 @@ const terrainSize = chunkWorldSize * 4;
 const chunkRadius = Math.sqrt(chunkWorldSize * chunkWorldSize * 3);
 const numLods = 1;
 const bufferSize = 20 * 1024 * 1024;
-const defaultNumNods = 3;
+const defaultNumNods = 2;
 const defaultMinLodRange = 2;
 
 // const textureLoader = new THREE.TextureLoader();
@@ -128,7 +130,7 @@ const texturesPerRow = Math.ceil(Math.sqrt(neededTexturePrefixes.length)); */
 
 const { BatchedMesh, GeometryAllocator } = useInstancing();
 class WaterMesh extends BatchedMesh {
-  constructor({ procGenInstance, physics, biomeUvDataTexture, textures }) {
+  constructor({ procGenInstance, physics, biomeUvDataTexture, textures, appMatrix }) {
     const allocator = new GeometryAllocator(
       [
         {
@@ -341,6 +343,7 @@ class WaterMesh extends BatchedMesh {
 
     this.localVector5 = new THREE.Vector3();
     this.physicsObjectToChunkMap = new Map();
+    this.appMatrix = appMatrix;
   }
 //   async addChunk(chunk, { signal }) {
 //     const renderData = await this.getChunkRenderData(chunk, signal);
@@ -376,7 +379,7 @@ class WaterMesh extends BatchedMesh {
       return null;
     }
   }
-  drawChunk(chunk, renderData, tracker) {
+  drawChunk(chunk, renderData, tracker, appMatrix) {
     if (renderData) {
       // non-empty chunk
       const { meshData, geometryBuffer } = renderData;
@@ -429,18 +432,34 @@ class WaterMesh extends BatchedMesh {
         geometry.index.update(indexOffset, meshData.indices.length);
       };
       const _handleMesh = () => {
+        /* if (!meshData) {
+          debugger;
+        } */
+        const chunkSize = chunkWorldSize * chunk.lod;
+
         localSphere.center.set(
-            (chunk.min.x + 0.5) * chunkWorldSize,
-            (chunk.min.y + 0.5) * chunkWorldSize,
-            (chunk.min.z + 0.5) * chunkWorldSize
+            (chunk.min.x + 0.5) * chunkSize,
+            (chunk.min.y + 0.5) * chunkSize,
+            (chunk.min.z + 0.5) * chunkSize
           )
           .applyMatrix4(this.matrixWorld);
         localSphere.radius = chunkRadius;
+
+        localVector3D.set(chunk.min.x, chunk.min.y, chunk.min.z).multiplyScalar(chunkSize); // min
+        localVector3D2.set(chunk.min.x, chunk.min.y, chunk.min.z).addScalar(chunk.lod).multiplyScalar(chunkSize); // max
+
+        // console.log(localVector3D.x + ", " + localVector3D2.x);
+
         const geometryBinding = this.allocator.alloc(
           meshData.positions.length,
           meshData.indices.length,
-          localSphere
+          meshData.peeks,
+          localSphere,
+          localVector3D,
+          localVector3D2,
+          this.appMatrix
         );
+        // console.log(localVector3D);
         _renderMeshDataToGeometry(
           meshData,
           this.allocator.geometry,
@@ -547,6 +566,7 @@ class WaterChunkGenerator {
     physics,
     // biomeUvDataTexture,
     textures,
+    appMatrix
   } = {}) {
     // parameters
     this.procGenInstance = procGenInstance;
@@ -563,6 +583,7 @@ class WaterChunkGenerator {
       physics: this.physics,
       // biomeUvDataTexture: this.biomeUvDataTexture,
       textures: this.textures,
+      appMatrix
     });
     this.object.add(this.waterMesh);
   }
@@ -633,7 +654,7 @@ class WaterChunkGenerator {
 //       }
 //     }
 //   }
-  async relodChunksTask(task, tracker) {
+  async relodChunksTask(task, tracker, appMatrix) {
     // console.log('got task', task);
     // const {oldChunks, newChunk, signal} = task;
     // console.log('relod chunk', task);
@@ -684,7 +705,7 @@ class WaterChunkGenerator {
       for (let i = 0; i < newNodes.length; i++) {
         const newNode = newNodes[i];
         const renderData = renderDatas[i];
-        this.waterMesh.drawChunk(newNode, renderData, signal, task, tracker);
+        this.waterMesh.drawChunk(newNode, renderData, signal, task, tracker, appMatrix);
       }
 
       task.commit();
@@ -814,12 +835,15 @@ export default (e) => {
           textures[textureNames[i]] = texturesArray[i];
         }
         const procGenInstance = procGenManager.getInstance(seed, range);
+
+        const appMatrix = app.matrixWorld;
   
         generator = new WaterChunkGenerator({
           procGenInstance,
           physics,
           // biomeUvDataTexture,
           textures,
+          appMatrix
         });
         // tracker = procGenInstance.getChunkTracker({
         //   numLods,
@@ -4872,9 +4896,9 @@ export default (e) => {
                 playEffectSw = 1;
                 if(fallindSpeed > 5){
                     let regex = new RegExp('^water/jump_water[0-9]*.wav$');
-                    const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
-                    const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
-                    sounds.playSound(audioSpec);
+                    // const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
+                    // const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
+                    // sounds.playSound(audioSpec);
                 }
             }
                 
