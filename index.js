@@ -701,8 +701,8 @@ export default (e) => {
 
   app.name = 'water';
 
-  let water = null;
-  let waterPhysicsId = null;
+  // let water = null;
+  // let waterPhysicsId = null;
   const waterSurfacePos = new THREE.Vector3(0, 10000, 0);
   const cameraWaterSurfacePos = new THREE.Vector3(0, 10000, 0);
   let contactWater = false;
@@ -769,32 +769,13 @@ export default (e) => {
         generator = new WaterChunkGenerator({
           procGenInstance,
           physics,
-          // biomeUvDataTexture,
           textures,
         });
         tracker = procGenInstance.getChunkTracker({
           numLods,
           trackY: true,
-          // relod: true,
         });
   
-        /* const coordupdate = (e) => {
-          const {coord} = e.data;
-          generator.waterMesh.updateCoord(coord);
-        }; */
-        /* const chunkremove = (e) => {
-          const {chunk} = e.data;
-          generator.disposeChunk(chunk);
-        };
-        const chunkrelod = (e) => {
-            const {oldChunks, newChunk} = e.data;
-            generator.relodChunks(oldChunks, newChunk);
-        }; */
-        /* tracker.addEventListener('coordupdate', coordupdate);
-        tracker.addEventListener('chunkadd', chunkadd);
-        tracker.addEventListener('chunkremove', chunkremove);
-        tracker.addEventListener('chunkrelod', chunkrelod); */
-
         const chunkdatarequest = (e) => {
           const {chunk, waitUntil, signal} = e.data;
       
