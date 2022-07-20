@@ -940,6 +940,7 @@ export default (e) => {
     let alreadySetComposer = false;
     
     useFrame(({timestamp, timeDiff}) => {
+      const raycastResults = [];
       if (!!tracker && !app.getComponent('renderPosition')) {
         const localPlayer = useLocalPlayer();
         localMatrix
@@ -990,7 +991,9 @@ export default (e) => {
                     generator.physics.enableGeometryQueries(tempPhysics);
                     localVector03.set(localPlayer.position.x, localPlayer.position.y, localPlayer.position.z);
                     const result3 = physics.raycast(localVector03, downVector);
+                    // window.domInfo.innerHTML += `raycast 1: ${!!result3}\n`
                     if(result3){
+                        raycastResults[0] = true;
                         if(result3.objectId === tempPhysics.physicsId){
                             waterSurfacePos.set(result3.point[0], result3.point[1], result3.point[2]);
                             playerIsOnSurface = true;
@@ -1010,7 +1013,9 @@ export default (e) => {
                     generator.physics.enableGeometryQueries(tempPhysics);
                     localVector04.set(camera.position.x + cameraDir.x * 0.2, camera.position.y, camera.position.z + cameraDir.z * 0.2);
                     const result4 = physics.raycast(localVector04, downVector);
+                    // window.domInfo.innerHTML += `raycast 2: ${!!result4}\n`
                     if(result4){
+                        raycastResults[1] = true;
                         if(result4.objectId === tempPhysics.physicsId){
                             cameraWaterSurfacePos.set(result4.point[0], result4.point[1], result4.point[2]);
                             cameraIsOnSurface = true;
@@ -1051,7 +1056,9 @@ export default (e) => {
                         mx.lookAt(localVector01, localVector05, upVector);
                         qt.setFromRotationMatrix(mx);
                         result = generator.physics.raycast(localVector01, qt);
+                        // window.domInfo.innerHTML += `raycast 3: ${!!result}\n`
                         if(result){
+                            raycastResults[2] = true;
                             if(result.objectId === tempPhysics.physicsId && result.distance <= ds){
                                 testContact1 = true;
                             }
@@ -1072,11 +1079,13 @@ export default (e) => {
                                                 generator.physics.disableGeometryQueries(p);
                                             }
                                             result = generator.physics.raycast(localVector01, qt);
+                                            // window.domInfo.innerHTML += `raycast 4: ${!!result}\n`
                                             for(const p of physicsList){
                                                 if(metaversefile.getAppByPhysicsId(p.physicsId).name !== 'water')
                                                     generator.physics.enableGeometryQueries(p);
                                             }
                                             if(result){
+                                                raycastResults[3] = true;
                                                 if(result.objectId === tempPhysics.physicsId && result.distance <= ds){
                                                     testContact1 = true;
                                                     break;
@@ -1105,7 +1114,9 @@ export default (e) => {
                         mx2.lookAt(localVector07, localVector05, upVector2);
                         qt2.setFromRotationMatrix(mx2);
                         result = generator.physics.raycast(localVector07, qt2);
+                        // window.domInfo.innerHTML += `raycast 5: ${!!result}\n`
                         if(result){
+                            raycastResults[4] = true;
                             if(result.objectId === tempPhysics.physicsId && result.distance <= ds){
                                 testContact2 = true;
                             }
@@ -1126,11 +1137,13 @@ export default (e) => {
                                                 generator.physics.disableGeometryQueries(p);
                                             }
                                             result = generator.physics.raycast(localVector07, qt2);
+                                            // window.domInfo.innerHTML += `raycast 6: ${!!result}\n`
                                             for(const p of physicsList){
                                                 if(metaversefile.getAppByPhysicsId(p.physicsId).name !== 'water')
                                                     generator.physics.enableGeometryQueries(p);
                                             }
                                             if(result){
+                                                raycastResults[5] = true;
                                                 if(result.objectId === tempPhysics.physicsId && result.distance <= ds){
                                                     testContact2 = true;
                                                     break;
@@ -1270,6 +1283,10 @@ export default (e) => {
         }
       }
       count++;
+
+      for (let i = 0; i < 6; i ++) {
+        window.domInfo.innerHTML += `<div>raycast ${i}: ${!!raycastResults[i]}</div>`
+      }
     });
   
     useCleanup(() => {
@@ -4871,10 +4888,10 @@ export default (e) => {
             if(playEffectSw === 0 && waterSurfacePos.y < localPlayer.position.y){
                 playEffectSw = 1;
                 if(fallindSpeed > 5){
-                    let regex = new RegExp('^water/jump_water[0-9]*.wav$');
-                    const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
-                    const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
-                    sounds.playSound(audioSpec);
+                    // let regex = new RegExp('^water/jump_water[0-9]*.wav$');
+                    // const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
+                    // const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
+                    // sounds.playSound(audioSpec);
                 }
             }
                 
