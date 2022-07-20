@@ -750,8 +750,8 @@ export default (e) => {
   const lods = app.getComponent('lods') ?? defaultNumNods;
   const minLodRange = app.getComponent('minLodRange') ?? defaultMinLodRange;
   const debug = app.getComponent('debug') ?? false;
-  let water = null;
-  let waterPhysicsId = null;
+//   let water = null;
+//   let waterPhysicsId = null;
   const waterSurfacePos = new THREE.Vector3(0, 63, 0);
   const cameraWaterSurfacePos = new THREE.Vector3(0, 63, 0);
   let contactWater = false;
@@ -818,7 +818,6 @@ export default (e) => {
         generator = new WaterChunkGenerator({
           procGenInstance,
           physics,
-          // biomeUvDataTexture,
           textures,
         });
         // tracker = procGenInstance.getChunkTracker({
