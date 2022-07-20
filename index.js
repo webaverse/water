@@ -981,7 +981,7 @@ export default (e) => {
                     if(!min || tempPos.distanceTo(localVector02) < min){
                         min = tempPos.distanceTo(localVector02);
                         tempPhysicsPos.set(tempPos.x, tempPos.y, tempPos.z);
-                        tempPhysics = physicsId;
+                        tempPhysics = physicsId; // note: Find nearest water chunk.
                     }
                 }
             }
@@ -993,8 +993,8 @@ export default (e) => {
                     const result3 = physics.raycast(localVector03, downVector);
                     // window.domInfo.innerHTML += `raycast 1: ${!!result3}\n`
                     if(result3){
-                        raycastResults[0] = true;
                         if(result3.objectId === tempPhysics.physicsId){
+                            raycastResults[0] = true;
                             waterSurfacePos.set(result3.point[0], result3.point[1], result3.point[2]);
                             playerIsOnSurface = true;
                             if(!playerHighestWaterSurface)
@@ -1015,8 +1015,8 @@ export default (e) => {
                     const result4 = physics.raycast(localVector04, downVector);
                     // window.domInfo.innerHTML += `raycast 2: ${!!result4}\n`
                     if(result4){
-                        raycastResults[1] = true;
                         if(result4.objectId === tempPhysics.physicsId){
+                            raycastResults[1] = true;
                             cameraWaterSurfacePos.set(result4.point[0], result4.point[1], result4.point[2]);
                             cameraIsOnSurface = true;
                             if(!cameraHighestWaterSurface)
@@ -1041,13 +1041,14 @@ export default (e) => {
 
                 const detectDistance = 0.3;
 
+                if (window.isDebugger) debugger
                 localVector01.set(tempPhysicsPos.x + tempDir.x * detectDistance, tempPhysicsPos.y + tempDir.y * detectDistance, tempPhysicsPos.z + tempDir.z * detectDistance);
                 localVector05.set(tempPhysicsPos.x, tempPhysicsPos.y, tempPhysicsPos.z);
-                localVector06.copy(localVector01).sub(localVector05);
+                localVector06.copy(localVector01).sub(localVector05); // todo: = tempDir.x/y/z * detectDistance
 
                 localVector07.set(tempPhysicsPos.x - tempDir.x * detectDistance, tempPhysicsPos.y - tempDir.y * detectDistance, tempPhysicsPos.z - tempDir.z * detectDistance);
             
-                const ds = Math.sqrt(localVector06.x * localVector06.x + localVector06.y * localVector06.y + localVector06.z * localVector06.z) * 2.5;
+                const ds = Math.sqrt(localVector06.x * localVector06.x + localVector06.y * localVector06.y + localVector06.z * localVector06.z) * 2.5; // todo: = 0.75 = detectDistance * 2.5 = 0.3 * 2.5
                 
                 {
                     let result;
@@ -1287,6 +1288,10 @@ export default (e) => {
       for (let i = 0; i < 6; i ++) {
         window.domInfo.innerHTML += `<div>raycast ${i}: ${!!raycastResults[i]}</div>`
       }
+      if (raycastResults[2] === raycastResults[4]) {
+        window.domInfo.innerHTML += `${!!raycastResults[2]} ${!!raycastResults[4]}</div>`
+      }
+      window.domInfo.innerHTML += `contactWater: ${contactWater}</div>`
     });
   
     useCleanup(() => {
