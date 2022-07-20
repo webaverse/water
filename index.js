@@ -4871,10 +4871,11 @@ export default (e) => {
             if(playEffectSw === 0 && waterSurfacePos.y < localPlayer.position.y){
                 playEffectSw = 1;
                 if(fallindSpeed > 5){
-                    let regex = new RegExp('^water/jump_water[0-9]*.wav$');
-                    const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
-                    const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
-                    sounds.playSound(audioSpec);
+                    // todo: Commented temporarily for merging, to prevent reporting error, need to be restored.
+                    // let regex = new RegExp('^water/jump_water[0-9]*.wav$');
+                    // const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
+                    // const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
+                    // sounds.playSound(audioSpec);
                 }
             }
                 
