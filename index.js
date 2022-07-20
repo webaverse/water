@@ -89,7 +89,9 @@ const chunkWorldSize = procGenManager.chunkSize;
 const terrainSize = chunkWorldSize * 4;
 const chunkRadius = Math.sqrt(chunkWorldSize * chunkWorldSize * 3);
 const numLods = 1;
-const bufferSize = 4 * 1024 * 1024;
+const bufferSize = 20 * 1024 * 1024;
+const defaultNumNods = 3;
+const defaultMinLodRange = 2;
 
 // const textureLoader = new THREE.TextureLoader();
 const abortError = new Error('chunk disposed');
@@ -287,9 +289,6 @@ class WaterMesh extends BatchedMesh {
             specularColor += pow( direction, shiny ) * vec3(0.3, 0.3, 0.3) * spec;
             diffuseColor += max( dot( sunDirection, surfaceNormal ), 0.0 ) * vec3(0.3, 0.3, 0.3) * diffuse;
         }
-  
-          float shineDamper = 30.;
-          float reflectivity = 1.5;
           void main() {
             vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
             vec4 noise = getNoise( worldPosition.xz * 2.);
@@ -314,66 +313,6 @@ class WaterMesh extends BatchedMesh {
  
               ${THREE.ShaderChunk.logdepthbuf_fragment}
           }
-
-          
-        //   float frac(float v)
-        //   {
-        //     return v - floor(v);
-        //   }
-        //   vec3 FlowUVW (vec2 uv, vec2 flowVector, vec2 jump, float flowOffset, float tiling, float time,  bool flowB) {
-        //       float phaseOffset = flowB ? 0.5 : 0.;
-        //       float progress = frac(time + phaseOffset);
-        //     vec3 uvw;
-        //       uvw.xy = uv - flowVector * (progress + flowOffset);
-        //       uvw.xy *= tiling;
-        //       uvw.xy += phaseOffset;
-        //       uvw.xy += (time - progress) * jump;
-        //       uvw.z = 1. - abs(1. - 2. * progress);
-        //       return uvw;
-        //   }
-        //   vec3 UnpackDerivativeHeight (vec4 textureData) {
-        //       vec3 dh = textureData.agb;
-        //       dh.xy = dh.xy * 2. - 1.;
-        //       return dh;
-        //   }
-  
-        //   float shineDamper = 30.;
-        //   float reflectivity = 1.5;
-        //   void main() {
-             
-        //       vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
-        //       vec3 sunToPlayer = normalize(sunPosition - playerPosition); 
-        //       vec3 worldToEye = vec3(playerPosition.x + sunToPlayer.x * 100., playerPosition.y, playerPosition.z + sunToPlayer.z * 100.)-worldPosition.xyz;
-              
-        //     //   vec3 eyeDirection = normalize( worldToEye );
-        //       vec3 eyeDirection = normalize(worldPosition.xyz - cameraPosition);
-        //       vec2 uv = worldPosition.xz * 0.05;
-
-        //       vec2 flowmap = texture2D(flowmapTexture, uv / 5.).rg * 2. - 1.;
-        //       flowmap *= uFlowStrength;
-        //       float noise = texture2D(flowmapTexture, uv).a;
-        //       float time = uTime * uSpeed + noise;
-        //       vec2 jump = vec2(uUJump, uVJump);
-        //       vec3 uvwA = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, false);
-        //       vec3 uvwB = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, true);
-
-        //       vec3 dhA = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwA.xy * 1.)) * uvwA.z * 20.5;
-        //       vec3 dhB = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwB.xy * 1.)) * uvwB.z * 20.5;
-        //       vec3 surfaceNormal = normalize(vec3(-(dhA.xy + dhB.xy), 1.));
-
-        //       vec3 fromSunVector = worldPosition.xyz - (sunPosition );
-        //       vec3 reflectedLight = reflect(normalize(fromSunVector), surfaceNormal);
-        //       float specular = max(dot(reflectedLight, eyeDirection), 0.0);
-        //       specular = pow(specular, shineDamper);
-        //       vec3 specularHighlight = vec3(0.9, 0.9, 0.9) * specular * reflectivity;
-                 
-        //       vec4 texA = texture2D(waterNoiseTexture, uvwA.xy) * uvwA.z;
-        //       vec4 texB = texture2D(waterNoiseTexture, uvwB.xy) * uvwB.z;
-
-        //       gl_FragColor = (texA + texB) * vec4(0.048, 0.24, 0.384, 0.9) + vec4(0.0282, 0.470, 0.431, 0.);
-        //       gl_FragColor.rgb /= 3.;
-        //       gl_FragColor += vec4( specularHighlight, 0.0 );
-        //   }
       `,
       side: THREE.DoubleSide,
       transparent: true,
@@ -401,11 +340,12 @@ class WaterMesh extends BatchedMesh {
     this.lightMapper = lightMapper;
 
     this.localVector5 = new THREE.Vector3();
+    this.physicsObjectToChunkMap = new Map();
   }
-  /* async addChunk(chunk, { signal }) {
-    const renderData = await this.getChunkRenderData(chunk, signal);
-    this.drawChunk(chunk, renderData, signal);
-  } */
+//   async addChunk(chunk, { signal }) {
+//     const renderData = await this.getChunkRenderData(chunk, signal);
+//     this.drawChunk(chunk, renderData, signal);
+//   }
   async getChunkRenderData(chunk, signal) {
     const meshData =
       await this.procGenInstance.dcWorkerManager.generateLiquidChunk(
@@ -415,20 +355,22 @@ class WaterMesh extends BatchedMesh {
           signal,
         }
       );
+      
     if (meshData) {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute(
-        'position',
-        new THREE.BufferAttribute(meshData.positions, 3)
-      );
-      geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
+      let geometryBuffer = null;
+      if (this.physics) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute(
+          'position',
+          new THREE.BufferAttribute(meshData.positions, 3)
+        );
+        geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
+        const physicsMesh = new THREE.Mesh(geometry, fakeMaterial);
 
-
-      const physicsMesh = new THREE.Mesh(geometry, fakeMaterial);
-
-      const geometryBuffer = await this.physics.cookGeometryAsync(physicsMesh, {
-        signal,
-      });
+        geometryBuffer = await this.physics.cookGeometryAsync(physicsMesh, {
+          signal,
+        });
+      }
       return new ChunkRenderData(meshData, geometryBuffer);
     } else {
       return null;
@@ -487,11 +429,10 @@ class WaterMesh extends BatchedMesh {
         geometry.index.update(indexOffset, meshData.indices.length);
       };
       const _handleMesh = () => {
-        localSphere.center
-          .set(
-            (chunk.x + 0.5) * chunkWorldSize,
-            (chunk.y + 0.5) * chunkWorldSize,
-            (chunk.z + 0.5) * chunkWorldSize
+        localSphere.center.set(
+            (chunk.min.x + 0.5) * chunkWorldSize,
+            (chunk.min.y + 0.5) * chunkWorldSize,
+            (chunk.min.z + 0.5) * chunkWorldSize
           )
           .applyMatrix4(this.matrixWorld);
         localSphere.radius = chunkRadius;
@@ -506,9 +447,20 @@ class WaterMesh extends BatchedMesh {
           geometryBinding
         );
 
+        // signal.addEventListener('abort', (e) => {
+        //   this.allocator.free(geometryBinding);
+        // });
+        let called = false;
         const onchunkremove = e => {
           const {chunk: removeChunk} = e.data;
           if (chunk.equalsNodeLod(removeChunk)) {
+            if (!called) {
+              called = true;
+            } else {
+              console.warn('double destroy');
+              debugger;
+            }
+
             this.allocator.free(geometryBinding);
           
             tracker.removeEventListener('chunkremove', onchunkremove);
@@ -527,6 +479,9 @@ class WaterMesh extends BatchedMesh {
           localVector2
         );
         this.physicsObjects.push(physicsObject);
+        this.physicsObjectToChunkMap.set(physicsObject, chunk);
+        
+
 
         this.physics.disableGeometryQueries(physicsObject);
         physicsObject.coord = chunk;
@@ -537,19 +492,37 @@ class WaterMesh extends BatchedMesh {
           (chunk.z + 0.5) * chunkWorldSize
         ).applyMatrix4(this.matrixWorld);
 
-        const onchunkremove = e => {
-          const {chunk: removeChunk} = e.data;
-          if (chunk.equalsNodeLod(removeChunk)) {
-            this.physics.removeGeometry(physicsObject);
-            this.physicsObjects.splice(
-              this.physicsObjects.indexOf(physicsObject),
-              1
-            );
+        let called = false;
+          const onchunkremove = e => {
+            const {chunk: removeChunk} = e.data;
+            if (chunk.equalsNodeLod(removeChunk)) {
+              if (!called) {
+                called = true;
+              } else {
+                console.warn('double destroy');
+                debugger;
+              }
 
-            tracker.removeEventListener('chunkremove', onchunkremove);
-          }
-        };
+              this.physics.removeGeometry(physicsObject);
+              this.physicsObjects.splice(
+                this.physicsObjects.indexOf(physicsObject),
+                1
+              );
+              this.physicsObjectToChunkMap.delete(physicsObject);
+
+              tracker.removeEventListener('chunkremove', onchunkremove);
+            }
+        }
         tracker.addEventListener('chunkremove', onchunkremove);
+
+        
+        // signal.addEventListener('abort', (e) => {
+        //   this.physics.removeGeometry(physicsObject);
+        //   this.physicsObjects.splice(
+        //     this.physicsObjects.indexOf(physicsObject),
+        //     1
+        //   );
+        // });
       };
       _handlePhysics();
     }
@@ -597,12 +570,15 @@ class WaterChunkGenerator {
   getMeshes() {
     return this.object.children;
   }
+  getChunkForPhysicsObject(physicsObject) {
+    return this.waterMesh.physicsObjectToChunkMap.get(physicsObject);
+  }
   getPhysicsObjects() {
     return this.waterMesh.physicsObjects;
   }
 
-  async generateChunk(chunk) {
-    const signal = this.bindChunk(chunk);
+  async generateChunk(chunk, {signal = null} = {}) {
+    // const signal = this.bindChunk(chunk);
 
     try {
       await this.waterMesh.addChunk(chunk, {
@@ -614,46 +590,111 @@ class WaterChunkGenerator {
       }
     }
   }
-  disposeChunk(chunk) {
-    const binding = chunk.binding;
-    if (binding) {
-      const { abortController } = binding;
-      abortController.abort(abortError);
+//   disposeChunk(chunk) {
+//     const binding = chunk.binding;
+//     if (binding) {
+//       const { abortController } = binding;
+//       abortController.abort(abortError);
 
-      chunk.binding = null;
-    }
-  }
-  async relodChunks(oldChunks, newChunk) {
-    // console.log('relod chunk', oldChunk, newChunk);
+//       chunk.binding = null;
+//     }
+//   }
+//   async relodChunks(oldChunks, newChunk) {
+//     // console.log('relod chunk', oldChunk, newChunk);
+
+//     try {
+//       const oldAbortControllers = oldChunks.map(oldChunk => {
+//         return oldChunk.binding.abortController;
+//       });
+//       // const oldAbortController = oldChunk.binding.abortController;
+//       const newSignal = this.bindChunk(newChunk);
+
+//       const abortOldChunks = e => {
+//         for (const oldAbortController of oldAbortControllers) {
+//           oldAbortController.abort(abortError);
+//         }
+//       };
+//       newSignal.addEventListener('abort', abortOldChunks);
+
+//       const renderData = await this.waterMesh.getChunkRenderData(
+//         newChunk,
+//         newSignal
+//       );
+
+//       newSignal.removeEventListener('abort', abortOldChunks);
+
+//       for (const oldChunk of oldChunks) {
+//         this.disposeChunk(oldChunk);
+//       }
+//       this.waterMesh.drawChunk(newChunk, renderData, newSignal);
+//     } catch (err) {
+//       if (!err?.isAbortError) {
+//         console.warn(err);
+//       }
+//     }
+//   }
+  async relodChunksTask(task, tracker) {
+    // console.log('got task', task);
+    // const {oldChunks, newChunk, signal} = task;
+    // console.log('relod chunk', task);
 
     try {
-      const oldAbortControllers = oldChunks.map(oldChunk => {
+      /* const oldAbortControllers = oldChunks.map(oldChunk => {
         return oldChunk.binding.abortController;
-      });
+      }); */
       // const oldAbortController = oldChunk.binding.abortController;
-      const newSignal = this.bindChunk(newChunk);
+      // const newSignal = this.bindChunk(newChunk);
 
-      const abortOldChunks = e => {
+      /* const abortOldChunks = e => {
         for (const oldAbortController of oldAbortControllers) {
           oldAbortController.abort(abortError);
         }
       };
-      newSignal.addEventListener('abort', abortOldChunks);
+      newSignal.addEventListener('abort', abortOldChunks); */
 
-      const renderData = await this.waterMesh.getChunkRenderData(
-        newChunk,
-        newSignal
-      );
+      let {maxLodNode, newNodes, oldNodes, signal} = task;
 
-      newSignal.removeEventListener('abort', abortOldChunks);
+      // newNodes = newNodes.filter(newNode => newNode.lod <= 2);
+      // console.log('got new nodes', newNodes, oldNodes);
 
-      for (const oldChunk of oldChunks) {
-        this.disposeChunk(oldChunk);
+      const renderDatas = await Promise.all(newNodes.map(newNode => this.waterMesh.getChunkRenderData(
+        newNode,
+        signal
+      )));
+      signal.throwIfAborted();
+
+      // console.log('got data', renderDatas);
+
+      // tracker.emitChunkDestroy(maxLodNode);
+      for (const oldNode of oldNodes) {
+        console.log('destroy old node', oldNode);
+        tracker.emitChunkDestroy(oldNode);
       }
-      this.waterMesh.drawChunk(newChunk, renderData, tracker);
+
+      /* for (const oldNode of oldNodes) {
+        const liveChunk = liveChunks.find(chunk => chunk.min.equals(oldNode.min));
+        if (liveChunk) {
+          liveChunk.destroy();
+          liveChunks.splice(liveChunks.indexOf(liveChunk), 1);
+        }
+      } */
+      /* for (const oldNode of oldNodes) {
+        oldNode.destroy();
+      } */
+      for (let i = 0; i < newNodes.length; i++) {
+        const newNode = newNodes[i];
+        const renderData = renderDatas[i];
+        this.waterMesh.drawChunk(newNode, renderData, signal, task, tracker);
+      }
+
+      task.commit();
     } catch (err) {
-      if (!err?.isAbortError) {
-        console.warn(err);
+      if (err?.isAbortError) {
+        // console.log('chunk render abort', new Error().stack);
+        // nothing
+      } else {
+        throw err;
+        // console.warn(err);
       }
     }
   }
@@ -700,11 +741,19 @@ export default (e) => {
   }
 
   app.name = 'water';
-
-  // let water = null;
-  // let waterPhysicsId = null;
-  const waterSurfacePos = new THREE.Vector3(0, 10000, 0);
-  const cameraWaterSurfacePos = new THREE.Vector3(0, 10000, 0);
+  const componentupdate = e => {
+    const {key, value} = e;
+    if (key === 'renderPosition') {
+      tracker.update(localVector.fromArray(value));
+    }
+  };
+  const lods = app.getComponent('lods') ?? defaultNumNods;
+  const minLodRange = app.getComponent('minLodRange') ?? defaultMinLodRange;
+  const debug = app.getComponent('debug') ?? false;
+//   let water = null;
+//   let waterPhysicsId = null;
+  const waterSurfacePos = new THREE.Vector3(0, 63, 0);
+  const cameraWaterSurfacePos = new THREE.Vector3(0, 63, 0);
   let contactWater = false;
   //let wholeBelowwWater = false;
   let floatOnWater = false;
@@ -771,46 +820,89 @@ export default (e) => {
           physics,
           textures,
         });
+        // tracker = procGenInstance.getChunkTracker({
+        //   numLods,
+        //   trackY: true,
+        //   relod: true,
+        // });
         tracker = procGenInstance.getChunkTracker({
-          numLods,
-          trackY: true,
+            lods,
+            minLodRange,
+            trackY: true,
+            debug,
         });
-  
-        const chunkdatarequest = (e) => {
-          const {chunk, waitUntil, signal} = e.data;
-      
-          const loadPromise = (async () => {
-            const renderData = await generator.waterMesh.getChunkRenderData(
-              chunk,
-              signal
-            );
-            signal.throwIfAborted();
-            return renderData;
-          })();
-          waitUntil(loadPromise);
-        };
-        const chunkadd = (e) => {
-          const {renderData, chunk} = e.data;
-          generator.waterMesh.drawChunk(chunk, renderData, tracker);
-        };
+        if (debug) {
+            app.add(tracker.debugMesh);
+            tracker.debugMesh.updateMatrixWorld();
+        }
+        tracker.addEventListener('coordupdate', coordupdate);
         tracker.addEventListener('chunkdatarequest', chunkdatarequest);
         tracker.addEventListener('chunkadd', chunkadd);
-
+        // tracker.addEventListener('chunkremove', chunkremove);
+        // tracker.addEventListener('chunkrelod', chunkrelod);
+        
+        const renderPosition = app.getComponent('renderPosition');
+        if (renderPosition) {
+            tracker.update(localVector.fromArray(renderPosition));
+        }
+        app.addEventListener('componentupdate', componentupdate);
+  
         if (wait) {
-          await new Promise((accept, reject) => {
-            tracker.addEventListener('update', () => {
-              accept();
-            }, {
-              once: true,
-            });
-          });
+        //   await new Promise((accept, reject) => {
+        //     tracker.addEventListener('update', () => {
+        //       accept();
+        //     }, {
+        //       once: true,
+        //     });
+        //   });
+            await tracker.waitForLoad();
         }
         app.add(generator.object);
         generator.object.updateMatrixWorld();
       })()
     );
   
-    // app.getPhysicsObjects = () => generator ? generator.getPhysicsObjects() : [];
+    app.getPhysicsObjects = () => generator ? generator.getPhysicsObjects() : [];
+    app.getChunkForPhysicsObject = (physicsObject) => generator ? generator.getChunkForPhysicsObject(physicsObject) : null;
+  
+    const coordupdate = (e) => {
+      const {coord} = e.data;
+      generator.getMeshes()[0].updateCoord(coord);
+    };
+    const chunkdatarequest = (e) => {
+       
+        const {chunk, waitUntil, signal} = e.data;
+    
+        // console.log('lod tracker chunkdatarequest', chunk);
+    
+        const loadPromise = (async () => {
+          const renderData = await generator.getMeshes()[0].getChunkRenderData(
+            chunk,
+            signal
+          ); 
+          
+          signal.throwIfAborted();
+          return renderData;
+        })();
+        waitUntil(loadPromise);
+    };
+    const chunkadd = (e) => {
+        const {renderData, chunk} = e.data;
+        generator.getMeshes()[0].drawChunk(chunk, renderData, tracker);
+    };
+    // const chunkadd = (e) => {
+    //   const {chunk, waitUntil} = e.data;
+    //   waitUntil(generator.generateChunk(chunk));
+    // };
+    // const chunkremove = (e) => {
+    //   const {chunk} = e.data;
+    //   generator.disposeChunk(chunk);
+    // };
+    // const chunkrelod = (e) => {
+    //     const {oldChunks, newChunk} = e.data;
+    //     generator.relodChunks(oldChunks, newChunk);
+    // };
+
 
     const localVector01 = new THREE.Vector3();
     const localVector02 = new THREE.Vector3();
@@ -846,13 +938,13 @@ export default (e) => {
 
     let alreadySetComposer = false;
     
-    
     useFrame(({timestamp, timeDiff}) => {
-      if (!!tracker && !range) {
+      if (!!tracker && !app.getComponent('renderPosition')) {
+        const localPlayer = useLocalPlayer();
         localMatrix
-          .copy(localPlayer.matrixWorld)
-          .premultiply(localMatrix2.copy(app.matrixWorld).invert())
-          .decompose(localVector, localQuaternion, localVector2);
+            .copy(localPlayer.matrixWorld)
+            .premultiply(localMatrix2.copy(app.matrixWorld).invert())
+            .decompose(localVector, localQuaternion, localVector2);
         tracker.update(localVector);
         if(generator && localPlayer.avatar){
             if(!alreadySetComposer){
@@ -861,19 +953,8 @@ export default (e) => {
                         if(pass.constructor.name === 'WebaWaterPass'){
                             pass._selects.push(generator.getMeshes()[0]);
                             pass.opacity = 0.12;
-                            // pass.foamDepthMaterial = depthMaterial;
-                            // pass.foamRenderTarget = renderTarget;
-                            // pass.invisibleSelects.push(generator.getMeshes()[0]);
                             pass.invisibleSelects.push(localPlayer.avatar.app);
-                            
-                            // pass.maxDistance = 10;
-                            // pass._fresnel = false;
-                            // pass.blur = false;
-                            // pass.player = localPlayer;
-                            // pass.thickness = 0.5;
-                            // pass.output = 6;
                             reflectionSsrPass = pass;
-                            
                         }
                     }
                     alreadySetComposer = true;
@@ -885,7 +966,6 @@ export default (e) => {
                 reflectionSsrPass.ssrMaterial.uniforms.distortionTexture.value = dudvMap;
                 reflectionSsrPass.combineMaterial.uniforms.dudvMap.value = dudvMap2;
                 reflectionSsrPass.combineMaterial.uniforms.time.value = timestamp / 1000;
-                
             }
 
             let playerIsOnSurface = false;
@@ -914,7 +994,7 @@ export default (e) => {
                             waterSurfacePos.set(result3.point[0], result3.point[1], result3.point[2]);
                             playerIsOnSurface = true;
                             if(!playerHighestWaterSurface)
-                                playerHighestWaterSurface = waterSurfacePos.y;
+                                playerHighestWaterSurface = result3.point[1];
                             else
                                 playerHighestWaterSurface = playerHighestWaterSurface < waterSurfacePos.y ? waterSurfacePos.y : playerHighestWaterSurface;
                         }
@@ -934,7 +1014,7 @@ export default (e) => {
                             cameraWaterSurfacePos.set(result4.point[0], result4.point[1], result4.point[2]);
                             cameraIsOnSurface = true;
                             if(!cameraHighestWaterSurface)
-                                cameraHighestWaterSurface = cameraWaterSurfacePos.y;
+                                cameraHighestWaterSurface = result4.point[1];
                             else
                                 cameraHighestWaterSurface = cameraHighestWaterSurface < cameraWaterSurfacePos.y ? cameraWaterSurfacePos.y : cameraHighestWaterSurface;
                         }
@@ -949,9 +1029,6 @@ export default (e) => {
             }
             else if(tempPhysics){
                 generator.physics.enableGeometryQueries(tempPhysics);
-
-
-                
 
                 tempDir.set(tempPhysicsPos.x - localPlayer.position.x, tempPhysicsPos.y - (localPlayer.position.y - localPlayer.avatar.height), tempPhysicsPos.z - localPlayer.position.z);
                 tempDir.normalize();
@@ -982,7 +1059,7 @@ export default (e) => {
                                     testContact1 = false;
                                 }
                                 else{
-                                    let maxCheck = 10;
+                                    let maxCheck = 5;
                                     let physicsList = [];
                                     for(let i = 0; i < maxCheck; i++){
                                         if(result.distance <= ds){
@@ -1036,7 +1113,7 @@ export default (e) => {
                                     testContact2 = false;
                                 }
                                 else{
-                                    let maxCheck = 10;
+                                    let maxCheck = 5;
                                     let physicsList = [];
                                     for(let i = 0; i < maxCheck; i++){
                                         if(result.distance <= ds){
@@ -4655,7 +4732,6 @@ export default (e) => {
             
         });
         group.add(splashMeshApp.scene)
-        app.add(group);
         splashMesh = splashMeshApp.scene.children[0];
         splashMesh.scale.set(0, 0, 0);
         splashMesh.material= new THREE.ShaderMaterial({
@@ -4794,10 +4870,11 @@ export default (e) => {
             if(playEffectSw === 0 && waterSurfacePos.y < localPlayer.position.y){
                 playEffectSw = 1;
                 if(fallindSpeed > 5){
-                    let regex = new RegExp('^water/jump_water[0-9]*.wav$');
-                    const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
-                    const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
-                    sounds.playSound(audioSpec);
+                    // todo: Commented temporarily for merging, to prevent reporting error, need to be restored.
+                    // let regex = new RegExp('^water/jump_water[0-9]*.wav$');
+                    // const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
+                    // const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
+                    // sounds.playSound(audioSpec);
                 }
             }
                 
