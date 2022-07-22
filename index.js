@@ -1911,7 +1911,7 @@ export default (e) => {
             if(timestamp - lastEmmitTime > 150 * Math.pow((1.1-currentSpeed),0.3)  && currentSpeed>0.005 && contactWater){
                 if(
                     (localPlayer.hasAction('swim') && localPlayer.getAction('swim').onSurface)
-                    ||(!localPlayer.hasAction('swim') && waterSurfacePos.y + 50 >= localPlayer.position.y - localPlayer.avatar.height + localPlayer.avatar.height * 0.3)
+                    ||(!localPlayer.hasAction('swim') && waterSurfacePos.y >= localPlayer.position.y - localPlayer.avatar.height * 0.7)
                 ){
                     if(localPlayer.rotation.x!==0){
                         playerRotationAttribute.setX(currentIndex,Math.PI+localPlayer.rotation.y);
