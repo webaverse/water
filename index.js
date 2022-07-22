@@ -4844,7 +4844,7 @@ export default (e) => {
         if (contactWater){
             if(playEffectSw === 0 && waterSurfacePos.y < localPlayer.position.y){
                 playEffectSw = 1;
-                if(fallindSpeed > 5){
+                if(fallindSpeed > 1){
                     // todo: Commented temporarily for merging, to prevent reporting error, need to be restored.
                     let regex = new RegExp('^water/jump_water[0-9]*.wav$');
                     const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
