@@ -329,8 +329,8 @@ class WaterMesh extends BatchedMesh {
               float noise = texture2D(flowmapTexture, uv).a;
               float time = uTime * uSpeed + noise;
               vec2 jump = vec2(uUJump, uVJump);
-              vec3 uvwA = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time / 2., false);
-              vec3 uvwB = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time / 2., true);
+              vec3 uvwA = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time / 1.7, false);
+              vec3 uvwB = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time / 1.7, true);
               vec3 dhA = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwA.xy * 0.5)) * uvwA.z * 5.5;
               vec3 dhB = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwB.xy * 0.5)) * uvwB.z * 5.5;
               vec3 surfaceNormal = normalize(vec3(-(dhA.xy + dhB.xy), 1.));
