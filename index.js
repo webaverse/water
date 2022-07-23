@@ -160,168 +160,169 @@ class WaterMesh extends BatchedMesh {
     //   material.uniforms.uLightBasePosition.value.copy(coord);
     //   material.uniforms.uLightBasePosition.needsUpdate = true;
     // });
+
+    
     
     const material = new THREE.ShaderMaterial({
-      uniforms: {
+        defines: {
+          DEPTH_PACKING: 1,
+          ORTHOGRAPHIC_CAMERA: 0
+        },
+        uniforms: {
           uTime: {
-              type: "f",
-              value: 0.0
+            value: 0
           },
           uUJump: {
-              type: "f",
-              value: 0.24
+            type: "f",
+            value: 0.24
           },
           uVJump: {
-              type: "f",
-              value: 0.208
+            type: "f",
+            value: 0.208
           },
           uTiling: {
-              type: "f",
-              value: 2
+            type: "f",
+            value: 2
           },
           uSpeed: {
-              type: "f",
-              value: 0.5
+            type: "f",
+            value: 0.5
           },
           uFlowStrength: {
-              type: "f",
-              value: 0.25
+            type: "f",
+            value: 0.25
           },
           uFlowOffset: {
-              type: "f",
-              value: -1.5
+            type: "f",
+            value: -1.5
           },
           sunPosition: {
-              value: new THREE.Vector3(200.0, 1.0, -600.)
-          },
-          sunDirection: {
-              value: new THREE.Vector3(200.0, 1.0, -600.)
+            value: new THREE.Vector3(200.0, 1.0, -600.)
           },
           playerPosition: {
-              value: new THREE.Vector3()
+            value: new THREE.Vector3()
           },
           playerDirection: {
-              value: new THREE.Vector3()
+            value: new THREE.Vector3()
           },
           waterDerivativeHeightTexture: {
-              value: waterNoiseTexture2
+            value: waterDerivativeHeightTexture
           },
           waterNoiseTexture: {
-              value: waterNoiseTexture
+            value: waterNoiseTexture
           },
           flowmapTexture: {
-              value: flowmapTexture
+            value: flowmapTexture
           },
-          waterNormalTexture1:{
-            value: waterNormalTexture1
-          },
-          waterNormalTexture2:{
-            value: waterNormalTexture2
-          }
-
-      },
-      vertexShader: `\
-          ${THREE.ShaderChunk.common}
-          ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
-          
-          uniform float uTime;
-
-          varying vec3 vPos;
-          varying vec2 vUv;
-          uniform sampler2D waterNormalTexture1;
-          uniform sampler2D waterNormalTexture2;
-          
-          void main() {
-              vPos = position;
-              vUv = uv;
-              vec3 pos = position;
-              vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
-              vec4 viewPosition = viewMatrix * modelPosition;
-              vec4 projectionPosition = projectionMatrix * viewPosition;
-      
-              gl_Position = projectionPosition;
-              ${THREE.ShaderChunk.logdepthbuf_vertex}
-          }`,
-      fragmentShader: `\
-          
-          
-          ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
-          #include <common>
-          #include <packing>
-          varying vec3 vPos;
-          varying vec2 vUv;
-          uniform mat4 modelMatrix;
-
-          uniform float uTime;
-          uniform float uUJump;
-          uniform float uVJump;
-          uniform float uTiling;
-          uniform float uSpeed;
-          uniform float uFlowStrength;
-          uniform float uFlowOffset;
-          uniform vec3 sunPosition;
-          uniform vec3 playerPosition;
-          uniform vec3 playerDirection;
-          uniform vec3 sunDirection;
-          
-
-          
-        //   uniform sampler2D waterDerivativeHeightTexture;
-        //   uniform sampler2D waterNoiseTexture;
-        //   uniform sampler2D flowmapTexture;
-          uniform sampler2D waterNormalTexture1;
-          uniform sampler2D waterNormalTexture2;
-
-        vec4 getNoise( vec2 uv ) {
-            vec2 uv0 = ( uv / 103.0 ) + vec2(uTime / 34.0, uTime / 58.0);
-            vec2 uv1 = uv / 107.0-vec2( uTime / -38.0, uTime / 64.0 );
-            vec2 uv2 = uv / vec2( 8907.0, 9803.0 ) + vec2( uTime / 202.0, uTime / 194.0 );
-            vec2 uv3 = uv / vec2( 1091.0, 1027.0 ) - vec2( uTime / 218.0, uTime / -226.0 );
-            vec4 noise = texture2D( waterNormalTexture1, uv0 ) +
-                texture2D( waterNormalTexture1, uv1 ) +
-                texture2D( waterNormalTexture2, uv2 ) +
-                texture2D( waterNormalTexture2, uv3 );
-            return noise * 0.5 - 1.0;
-        }
-        void sunLight( const vec3 surfaceNormal, const vec3 eyeDirection, float shiny, float spec, float diffuse, inout vec3 diffuseColor, inout vec3 specularColor ) {
-            vec3 reflection = normalize( reflect( -sunDirection, surfaceNormal ) );
-            float direction = max( 0.0, dot( eyeDirection, reflection ) );
-            specularColor += pow( direction, shiny ) * vec3(0.3, 0.3, 0.3) * spec;
-            diffuseColor += max( dot( sunDirection, surfaceNormal ), 0.0 ) * vec3(0.3, 0.3, 0.3) * diffuse;
-        }
-          void main() {
-            vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
-            vec4 noise = getNoise( worldPosition.xz * 2.);
-            vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
-
-            vec3 diffuseLight = vec3(1.0);
-            vec3 specularLight = vec3(0.1, 0.6, 0.6);
-            vec3 worldToEye = worldPosition.xyz - cameraPosition;
-            vec3 eyeDirection = normalize( worldToEye );
-            sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );
-            float distance = length(worldToEye);
-            // vec2 distortion = surfaceNormal.xz * ( 0.001 + 1.0 / distance ) * distortionScale;
-
-            float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
-            float rf0 = 0.3;
-            float reflectance = rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 );
-            vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * vec3(1.0, 1.0, 1.0);
-            vec3 albedo = ( vec3(0.3, 0.3, 0.3) * diffuseLight * 0.025 + scatter );
-            vec3 outgoingLight = albedo;
-            gl_FragColor = (vec4( outgoingLight, 0.95 ) * vec4(0.048, 0.3, 0.384, 1.0)) + + vec4(0.0282, 0.470, 0.431, 0.);
+        },
+        vertexShader: `\
             
- 
-              ${THREE.ShaderChunk.logdepthbuf_fragment}
-          }
-      `,
-      side: THREE.DoubleSide,
-      transparent: true,
-      depthFunc: THREE.LessDepth,
-    //   depthWrite: false,
-    //   blending: THREE.AdditiveBlending,
+            ${THREE.ShaderChunk.common}
+            ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+  
+            varying vec2 vUv;
+            varying vec3 vPos;
+            
+            void main() {
+                vUv = uv;
+  
+                vPos = position;
+                vec3 pos = position;
+                vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+                vec4 viewPosition = viewMatrix * modelPosition;
+                vec4 projectionPosition = projectionMatrix * viewPosition;
+        
+                gl_Position = projectionPosition;
+                ${THREE.ShaderChunk.logdepthbuf_vertex}
+            }
+        `,
+        fragmentShader: `\
+            ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
+            #include <common>
+            #include <packing>
+            uniform mat4 modelMatrix;
+
+
+            uniform float uTime;
+            uniform float uUJump;
+            uniform float uVJump;
+            uniform float uTiling;
+            uniform float uSpeed;
+            uniform float uFlowStrength;
+            uniform float uFlowOffset;
+            uniform vec3 sunPosition;
+            uniform vec3 playerPosition;
+            uniform vec3 playerDirection;
+            uniform sampler2D waterDerivativeHeightTexture;
+            uniform sampler2D waterNoiseTexture;
+            uniform sampler2D flowmapTexture;
 
   
-    });
+            varying vec2 vUv;
+            varying vec3 vPos;
+            
+            float frac(float v)
+            {
+                return v - floor(v);
+            }
+            vec3 FlowUVW (vec2 uv, vec2 flowVector, vec2 jump, float flowOffset, float tiling, float time,  bool flowB) {
+                float phaseOffset = flowB ? 0.5 : 0.;
+                float progress = frac(time + phaseOffset);
+                vec3 uvw;
+                uvw.xy = uv - flowVector * (progress + flowOffset);
+                uvw.xy *= tiling;
+                uvw.xy += phaseOffset;
+                uvw.xy += (time - progress) * jump;
+                uvw.z = 1. - abs(1. - 2. * progress);
+                return uvw;
+            }
+            vec3 UnpackDerivativeHeight (vec4 textureData) {
+                vec3 dh = textureData.agb;
+                dh.xy = dh.xy * 2. - 1.;
+                return dh;
+            }
+            
+            float shineDamper = 10.;
+            float reflectivity = 0.1;
+            void main() {
+              vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
+              vec3 sunToPlayer = normalize(sunPosition - playerPosition); 
+              vec3 worldToEye = vec3(playerPosition.x + sunToPlayer.x * 100., playerPosition.y, playerPosition.z + sunToPlayer.z * 100.)-worldPosition.xyz;
+              
+              vec3 eyeDirection = normalize( worldToEye );
+            //   vec3 eyeDirection = normalize(worldPosition.xyz - cameraPosition);
+              vec2 uv = worldPosition.xz * 0.05;
+              vec2 flowmap = texture2D(flowmapTexture, uv / 5.).rg * 2. - 1.;
+              flowmap *= uFlowStrength;
+              float noise = texture2D(flowmapTexture, uv).a;
+              float time = uTime * uSpeed + noise;
+              vec2 jump = vec2(uUJump, uVJump);
+              vec3 uvwA = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time / 1.7, false);
+              vec3 uvwB = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time / 1.7, true);
+              vec3 dhA = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwA.xy * 0.5)) * uvwA.z * 5.5;
+              vec3 dhB = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwB.xy * 0.5)) * uvwB.z * 5.5;
+              vec3 surfaceNormal = normalize(vec3(-(dhA.xy + dhB.xy), 1.));
+              vec3 fromSunVector = worldPosition.xyz - (sunPosition + playerPosition);
+              vec3 reflectedLight = reflect(normalize(fromSunVector), surfaceNormal);
+              float specular = max(dot(reflectedLight, eyeDirection), 0.0);
+              specular = pow(specular, shineDamper);
+              vec3 specularHighlight = vec3(0.0282 * 0.9, 0.431 * 0.9, 0.47 * 0.9) * specular * reflectivity;
+                 
+              vec4 texA = texture2D(waterNoiseTexture, uvwA.xy) * uvwA.z;
+              vec4 texB = texture2D(waterNoiseTexture, uvwB.xy) * uvwB.z;
+              gl_FragColor = (texA + texB) * vec4(0.048 / 1.5, 0.24 / 1.5, 0.384 / 1.5, 0.97) + vec4(0.0282, 0.431, 0.47, 0.);
+              gl_FragColor.rgb /= 3.;
+              gl_FragColor += vec4( specularHighlight, 0.0 );
+
+              
+              
+              ${THREE.ShaderChunk.logdepthbuf_fragment}
+            }
+        `,
+        side: THREE.DoubleSide,
+        transparent: true
+        // fog: true
+      });
     
     // const {renderer} = useInternals();
     // renderer.context.depthFunc(renderer.context.LESS)
@@ -756,7 +757,7 @@ export default (e) => {
   const cameraWaterSurfacePos = new THREE.Vector3(0, 63, 0);
   let contactWater = false;
   //let wholeBelowwWater = false;
-  let floatOnWater = false;
+//   let floatOnWater = false;
   let cameraDir = new THREE.Vector3();
   let playerDir = new THREE.Vector3();
   const playerHeadPos = new THREE.Vector3();
@@ -937,7 +938,43 @@ export default (e) => {
     let lastSwimmingHand = null;
 
     let alreadySetComposer = false;
+
+    const rayCastByEliminatingChunk = (generator, result, ds, testVector, quaternion, targetPhysics) =>{
+        let maxCheck = 5;
+        let physicsList = [];
+        for(let i = 0; i < maxCheck; i++){
+            if(result.distance <= ds){
+                let dummy = metaversefile.getPhysicsObjectByPhysicsId(result.objectId);
+                if(dummy){
+                    physicsList.push(dummy);
+                }
+                for(const p of physicsList){
+                    generator.physics.disableGeometryQueries(p);
+                }
+                result = generator.physics.raycast(testVector, quaternion);
+                for(const p of physicsList){
+                    if(metaversefile.getAppByPhysicsId(p.physicsId).name !== 'water')
+                        generator.physics.enableGeometryQueries(p);
+                }
+                if(result){
+                    if(result.objectId === targetPhysics.physicsId && result.distance <= ds){
+                        return true;
+                    }
+                }
+                else{
+                    return false;
+                } 
+            }
+            else{
+                return false;
+            }
+            if(i === maxCheck - 1){
+                return false;
+            }
+        }
+    }
     
+
     useFrame(({timestamp, timeDiff}) => {
       if (!!tracker && !app.getComponent('renderPosition')) {
         const localPlayer = useLocalPlayer();
@@ -953,7 +990,6 @@ export default (e) => {
                         if(pass.constructor.name === 'WebaWaterPass'){
                             pass._selects.push(generator.getMeshes()[0]);
                             pass.opacity = 0.12;
-                            pass.invisibleSelects.push(localPlayer.avatar.app);
                             reflectionSsrPass = pass;
                         }
                     }
@@ -964,9 +1000,8 @@ export default (e) => {
             if(reflectionSsrPass){
                 reflectionSsrPass.ssrMaterial.uniforms.uTime.value = timestamp / 1000;
                 reflectionSsrPass.ssrMaterial.uniforms.distortionTexture.value = dudvMap;
-                reflectionSsrPass.combineMaterial.uniforms.dudvMap.value = dudvMap2;
-                reflectionSsrPass.combineMaterial.uniforms.time.value = timestamp / 1000;
             }
+            
 
             let playerIsOnSurface = false;
             let cameraIsOnSurface = false;
@@ -975,7 +1010,7 @@ export default (e) => {
             localVector02.set(localPlayer.position.x, localPlayer.position.y - localPlayer.avatar.height, localPlayer.position.z);
             for(const physicsId of generator.getPhysicsObjects()){ 
                 for(let i = 0; i < physicsId.positions.length / 3; i++){
-                    tempPos.set(physicsId.positions[i * 3 + 0], physicsId.positions[i * 3 + 1], physicsId.positions[i * 3 + 2]);
+                    tempPos.set(app.position.x + physicsId.positions[i * 3 + 0], app.position.y + physicsId.positions[i * 3 + 1], app.position.z + physicsId.positions[i * 3 + 2]);
                     if(!min || tempPos.distanceTo(localVector02) < min){
                         min = tempPos.distanceTo(localVector02);
                         tempPhysicsPos.set(tempPos.x, tempPos.y, tempPos.z);
@@ -1044,7 +1079,7 @@ export default (e) => {
                 const ds = Math.sqrt(localVector06.x * localVector06.x + localVector06.y * localVector06.y + localVector06.z * localVector06.z) * 2.5;
                 
                 {
-                    let result;
+                    let result = null;
                     if(count % 2 === 0){
                         upVector.crossVectors(localVector01, localVector05);
                         mx.lookAt(localVector01, localVector05, upVector);
@@ -1059,42 +1094,7 @@ export default (e) => {
                                     testContact1 = false;
                                 }
                                 else{
-                                    let maxCheck = 5;
-                                    let physicsList = [];
-                                    for(let i = 0; i < maxCheck; i++){
-                                        if(result.distance <= ds){
-                                            let dummy = metaversefile.getPhysicsObjectByPhysicsId(result.objectId);
-                                            if(dummy){
-                                                physicsList.push(dummy);
-                                            }
-                                            for(const p of physicsList){
-                                                generator.physics.disableGeometryQueries(p);
-                                            }
-                                            result = generator.physics.raycast(localVector01, qt);
-                                            for(const p of physicsList){
-                                                if(metaversefile.getAppByPhysicsId(p.physicsId).name !== 'water')
-                                                    generator.physics.enableGeometryQueries(p);
-                                            }
-                                            if(result){
-                                                if(result.objectId === tempPhysics.physicsId && result.distance <= ds){
-                                                    testContact1 = true;
-                                                    break;
-                                                }
-                                            }
-                                            else{
-                                                testContact1 = false;
-                                                break;
-                                            } 
-                                        }
-                                        else{
-                                            testContact1 = false;
-                                            break;
-                                        }
-                                        if(i === maxCheck - 1){
-                                            //console.log('no result');
-                                            testContact1 = false;
-                                        }
-                                    }
+                                    testContact1 = rayCastByEliminatingChunk(generator, result, ds, localVector01, qt, tempPhysics);
                                 }
                             }
                         }
@@ -1113,42 +1113,7 @@ export default (e) => {
                                     testContact2 = false;
                                 }
                                 else{
-                                    let maxCheck = 5;
-                                    let physicsList = [];
-                                    for(let i = 0; i < maxCheck; i++){
-                                        if(result.distance <= ds){
-                                            let dummy = metaversefile.getPhysicsObjectByPhysicsId(result.objectId);
-                                            if(dummy){
-                                                physicsList.push(dummy);
-                                            }
-                                            for(const p of physicsList){
-                                                generator.physics.disableGeometryQueries(p);
-                                            }
-                                            result = generator.physics.raycast(localVector07, qt2);
-                                            for(const p of physicsList){
-                                                if(metaversefile.getAppByPhysicsId(p.physicsId).name !== 'water')
-                                                    generator.physics.enableGeometryQueries(p);
-                                            }
-                                            if(result){
-                                                if(result.objectId === tempPhysics.physicsId && result.distance <= ds){
-                                                    testContact2 = true;
-                                                    break;
-                                                }
-                                            }
-                                            else{
-                                                testContact2 = false;
-                                                break;
-                                            } 
-                                        }
-                                        else{
-                                            testContact2 = false;
-                                            break;
-                                        }
-                                        if(i === maxCheck - 1){
-                                            //console.log('no result');
-                                            testContact2 = false;
-                                        }
-                                    }
+                                    testContact2 = rayCastByEliminatingChunk(generator, result, ds, localVector07, qt2, tempPhysics)
                                 }
                             }
                         }
@@ -1263,9 +1228,6 @@ export default (e) => {
             generator.getMeshes()[0].material.uniforms.uTime.value = timestamp / 1000;
             generator.getMeshes()[0].material.uniforms.playerPosition.value.copy(localPlayer.position);
             generator.getMeshes()[0].material.uniforms.playerDirection.value.copy(playerDir);
-            
-                
-                
         }
       }
       count++;
@@ -1340,7 +1302,7 @@ export default (e) => {
             
 
             void main() {
-                gl_FragColor = vec4(0.0141, 0.235, 0.2355, 0.7);
+                gl_FragColor = vec4(0.0141, 0.235, 0.25, 0.7);
                 if(!contactWater || vPos.y > cameraWaterSurfacePos.y)
                     discard;
             ${THREE.ShaderChunk.logdepthbuf_fragment}
@@ -1357,11 +1319,11 @@ export default (e) => {
     let cameraHasMask = false;
     let alreadySetComposer = false;
     useFrame(({timestamp}) => {
-        if(!alreadySetComposer){
-            if(reflectionSsrPass){
-                // reflectionSsrPass.invisibleSelects.push(mask);
-                alreadySetComposer = true;
-            }
+        if(!alreadySetComposer && renderSettings.findRenderSettings(scene)){
+            renderSettings.findRenderSettings(scene).fog.color.r = 4 / 255;
+            renderSettings.findRenderSettings(scene).fog.color.g = 41.5 / 255;
+            renderSettings.findRenderSettings(scene).fog.color.b = 44.5 / 255;
+            alreadySetComposer = true;
         }
        
       
@@ -1523,7 +1485,6 @@ export default (e) => {
                 if(gl_FragColor.a < 0.25){
                     discard;
                 }
-                gl_FragColor.a *= 0.5;
             ${THREE.ShaderChunk.logdepthbuf_fragment}
             }
         `,
@@ -1549,8 +1510,6 @@ export default (e) => {
         app.add(mesh);
     }
     addInstancedMesh();
-        
-    const bubblePos = new THREE.Vector3();
     let maxEmmit = 5;
     let lastEmmitTime = 0;
     useFrame(({timestamp}) => {
@@ -1564,14 +1523,13 @@ export default (e) => {
             const startTimeAttribute = mesh.geometry.getAttribute('startTime');
             if(timestamp - lastEmmitTime > 100 && contactWater){
                 for (let i = 0; i < (Math.floor(currentSpeed * 10 + 1) * 5)  ; i++){
-                    bubblePos.set(positionsAttribute.getX(i), positionsAttribute.getY(i), positionsAttribute.getZ(i));
                     if(scalesAttribute.getX(i) <= 0){
                         
                         if(currentSpeed > 0.1){
                             // playerHeadPos.x += -playerDir.x * 0.25;
                             // playerHeadPos.z += -playerDir.z * 0.25;
                             playerHeadPos.x += (Math.random() - 0.5) * 0.5;
-                            playerHeadPos.y + (Math.random() - 0.5) * 0.2;
+                            playerHeadPos.y += (Math.random() - 0.5) * 0.2;
                             playerHeadPos.z += (Math.random() - 0.5) * 0.5;
                             info.velocity[i].x = -playerDir.x * 0.005;
                             info.velocity[i].y = 0.0025 + Math.random() * 0.0025;
@@ -1590,8 +1548,8 @@ export default (e) => {
                             
                         }
                         if(playerHeadPos.y > waterSurfacePos.y)
-                            playerHeadPos.y = waterSurfacePos.y;
-                        positionsAttribute.setXYZ(i, playerHeadPos.x , playerHeadPos.y, playerHeadPos.z);
+                            playerHeadPos.y = waterSurfacePos.y - app.position.y;
+                        positionsAttribute.setXYZ(i, playerHeadPos.x - app.position.x, playerHeadPos.y - app.position.y, playerHeadPos.z - app.position.z);
                         
                         
                         
@@ -1614,13 +1572,13 @@ export default (e) => {
             }
             
             for (let i = 0; i < particleCount; i++){
-                if(positionsAttribute.getY(i) >= waterSurfacePos.y - 0.01){
+                if(positionsAttribute.getY(i) >= waterSurfacePos.y - 0.005 - app.position.y){
                     info.velocity[i].y = 0;
                 }
                 positionsAttribute.setXYZ(  i, 
-                                            positionsAttribute.getX(i)+info.velocity[i].x,
-                                            positionsAttribute.getY(i)+info.velocity[i].y,
-                                            positionsAttribute.getZ(i)+info.velocity[i].z
+                                            positionsAttribute.getX(i) + info.velocity[i].x,
+                                            positionsAttribute.getY(i) + info.velocity[i].y,
+                                            positionsAttribute.getZ(i) + info.velocity[i].z
                 );
                 
                 startTimeAttribute.setX(i, startTimeAttribute.getX(i) + 1);
@@ -1632,7 +1590,7 @@ export default (e) => {
                 offsetAttribute.setXY(i, (5 / 6) - Math.floor(info.offset[i] / 6) * (1. / 6.), Math.floor(info.offset[i] % 5) * 0.2);
                 if(scalesAttribute.getX(i) > 0)
                     scalesAttribute.setX(i, scalesAttribute.getX(i) + 0.01);
-                if(startTimeAttribute.getX(i) > info.lastTime[i] || positionsAttribute.getY(i) > waterSurfacePos.y){
+                if(startTimeAttribute.getX(i) > info.lastTime[i] || positionsAttribute.getY(i) > waterSurfacePos.y - app.position.y){
                     scalesAttribute.setX(i, 0);
                 }
             }
@@ -1949,7 +1907,7 @@ export default (e) => {
             if(timestamp - lastEmmitTime > 150 * Math.pow((1.1-currentSpeed),0.3)  && currentSpeed>0.005 && contactWater){
                 if(
                     (localPlayer.hasAction('swim') && localPlayer.getAction('swim').onSurface)
-                    ||(!localPlayer.hasAction('swim') && waterSurfacePos.y >= localPlayer.position.y - localPlayer.avatar.height + localPlayer.avatar.height * 0.3)
+                    ||(!localPlayer.hasAction('swim') && waterSurfacePos.y >= localPlayer.position.y - localPlayer.avatar.height * 0.7)
                 ){
                     if(localPlayer.rotation.x!==0){
                         playerRotationAttribute.setX(currentIndex,Math.PI+localPlayer.rotation.y);
@@ -1964,17 +1922,17 @@ export default (e) => {
                     if(currentSpeed > 0.1){
                         positionsAttribute.setXYZ(
                             currentIndex,
-                            localPlayer.position.x + 0.25 * playerDir.x + (Math.random() - 0.5) * 0.1, 
-                            waterSurfacePos.y + 0.01, 
-                            localPlayer.position.z + 0.25 * playerDir.z + (Math.random() - 0.5) * 0.1
+                            localPlayer.position.x + 0.25 * playerDir.x + (Math.random() - 0.5) * 0.1 - app.position.x, 
+                            waterSurfacePos.y + 0.01 - app.position.y, 
+                            localPlayer.position.z + 0.25 * playerDir.z + (Math.random() - 0.5) * 0.1 - app.position.z
                         );
                     }
                     else{
                         positionsAttribute.setXYZ(
                             currentIndex,
-                            localPlayer.position.x - 0.05 * playerDir.x, 
-                            waterSurfacePos.y + 0.01, 
-                            localPlayer.position.z - 0.05 * playerDir.z
+                            localPlayer.position.x - 0.05 * playerDir.x - app.position.x, 
+                            waterSurfacePos.y + 0.01 - app.position.y, 
+                            localPlayer.position.z - 0.05 * playerDir.z - app.position.z
                         );
                     }
                     
@@ -2216,9 +2174,9 @@ export default (e) => {
                     opacityAttribute.setX(currentIndex, 0.1);
                     positionsAttribute.setXYZ(
                         currentIndex,
-                        localPlayer.position.x + 0.2 * playerDir.x + (Math.random() - 0.5) * 0.1, 
-                        waterSurfacePos.y + 0.01, 
-                        localPlayer.position.z + 0.2 * playerDir.z + (Math.random() - 0.5) * 0.1
+                        localPlayer.position.x + 0.2 * playerDir.x + (Math.random() - 0.5) * 0.1 - app.position.x, 
+                        waterSurfacePos.y + 0.01 - app.position.y, 
+                        localPlayer.position.z + 0.2 * playerDir.z + (Math.random() - 0.5) * 0.1 - app.position.z
                     );
                     textureRotationAttribute.setX(currentIndex, Math.random() * 2);
                     currentIndex++;
@@ -2464,9 +2422,9 @@ export default (e) => {
                         info.velocity[i].y = 0.08 + Math.random() * 0.08;
                         info.velocity[i].z = localVector2.z * (Math.random() - 0.5) * 0.2 + playerDir.z * splashposition2 * (1 + currentSpeed);
                         positionsAttribute.setXYZ(  i, 
-                                                    localPlayer.position.x + info.velocity[i].x * 0.5 + playerDir.x * splashposition,
-                                                    waterSurfacePos.y - 0.1 * Math.random(),
-                                                    localPlayer.position.z + info.velocity[i].z * 0.5 + playerDir.z * splashposition
+                                                    localPlayer.position.x + info.velocity[i].x * 0.5 + playerDir.x * splashposition - app.position.x,
+                                                    waterSurfacePos.y - 0.1 * Math.random() - app.position.y,
+                                                    localPlayer.position.z + info.velocity[i].z * 0.5 + playerDir.z * splashposition - app.position.z
                         );
                         info.velocity[i].divideScalar(5);
                         info.acc[i] = -0.0015 - currentSpeed * 0.0015;
@@ -2765,9 +2723,9 @@ export default (e) => {
                                 info.velocity[i].y = 0.18 + Math.random() * 0.18;
                                 info.velocity[i].z = (Math.random() - 0.5) * 0.1 + playerDir.z * 0.45 * (1 + currentSpeed) + localVector2.z * 0.1;
                                 positionsAttribute.setXYZ(  i, 
-                                                            localPlayer.position.x + (Math.random() - 0.5) * 0.1 + info.velocity[i].x - playerDir.x * 0.15,
-                                                            waterSurfacePos.y,
-                                                            localPlayer.position.z + (Math.random() - 0.5) * 0.1 + info.velocity[i].z - playerDir.z * 0.15
+                                                            localPlayer.position.x + (Math.random() - 0.5) * 0.1 + info.velocity[i].x - playerDir.x * 0.15 - app.position.x,
+                                                            waterSurfacePos.y - app.position.y,
+                                                            localPlayer.position.z + (Math.random() - 0.5) * 0.1 + info.velocity[i].z - playerDir.z * 0.15 - app.position.z
                                 );
                                 info.velocity[i].divideScalar(10);
                                 info.acc[i] = -0.001 - currentSpeed * 0.0015;
@@ -2790,9 +2748,9 @@ export default (e) => {
                                 info.velocity[i].y = 0.18 + Math.random() * 0.18;
                                 info.velocity[i].z = (Math.random() - 0.5) * 0.1 + playerDir.z * 0.45 * (1 + currentSpeed)  - localVector2.z * 0.1;
                                 positionsAttribute.setXYZ(  i, 
-                                                            localPlayer.position.x + (Math.random() - 0.5) * 0.1 + info.velocity[i].x - playerDir.x * 0.25,
-                                                            waterSurfacePos.y,
-                                                            localPlayer.position.z + (Math.random() - 0.5) * 0.1 + info.velocity[i].z - playerDir.z * 0.25
+                                                            localPlayer.position.x + (Math.random() - 0.5) * 0.1 + info.velocity[i].x - playerDir.x * 0.25 - app.position.x,
+                                                            waterSurfacePos.y - app.position.y,
+                                                            localPlayer.position.z + (Math.random() - 0.5) * 0.1 + info.velocity[i].z - playerDir.z * 0.25 - app.position.z
                                 );
                                 info.velocity[i].divideScalar(10);
                                 info.acc[i] = -0.001 - currentSpeed * 0.0015;
@@ -3051,10 +3009,20 @@ export default (e) => {
     useFrame(({timestamp}) => {
         if(!localPlayer.avatar)
             return;
-        if (waterSurfacePos.y < localPlayer.position.y && waterSurfacePos.y > localPlayer.position.y - localPlayer.avatar.height * 0.95 && timestamp - lastTimePlaySplash > 150){
-            if(playEffectSw === 0 && Math.abs(localPlayer.characterPhysics.velocity.y) > 2.3 && Math.abs(localPlayer.position.y - lastPlayerPositionY) > 0.05 && currentSpeed < 0.1){
+        // if (waterSurfacePos.y < localPlayer.position.y && waterSurfacePos.y > localPlayer.position.y - localPlayer.avatar.height * 0.95 && timestamp - lastTimePlaySplash > 150){
+        //     if(playEffectSw === 0 && Math.abs(localPlayer.characterPhysics.velocity.y) > 2.3 && Math.abs(localPlayer.position.y - lastPlayerPositionY) > 0.05 && currentSpeed < 0.1){
+        //         playEffectSw = 1;
+        //         lastTimePlaySplash = timestamp;
+        //     }
+                
+        // }
+        // else{
+        //     if(playEffectSw === 2)
+        //         playEffectSw = 0;
+        // }
+        if (contactWater){
+            if(playEffectSw === 0 && waterSurfacePos.y < localPlayer.position.y){
                 playEffectSw = 1;
-                lastTimePlaySplash = timestamp;
             }
                 
         }
@@ -3081,9 +3049,9 @@ export default (e) => {
                             info.velocity[i].y = 0.2 * 1.1;
                             info.velocity[i].z = (Math.random() - 0.5) * 0.1 * 1.5;
                             positionsAttribute.setXYZ(  i, 
-                                                        localPlayer.position.x + info.velocity[i].x,
-                                                        waterSurfacePos.y - 0.1 * Math.random(),
-                                                        localPlayer.position.z + info.velocity[i].z
+                                                        localPlayer.position.x + info.velocity[i].x - app.position.x,
+                                                        waterSurfacePos.y - 0.1 * Math.random() - app.position.y,
+                                                        localPlayer.position.z + info.velocity[i].z - app.position.z
                             );
                             info.velocity[i].divideScalar(7);
                             info.acc[i] = -0.0015;
@@ -3340,6 +3308,7 @@ export default (e) => {
             if(playEffectSw === 2)
                 playEffectSw = 0;
         }
+        
 
         if (mesh) {
             //console.log(Math.floor(currentSpeed * 10 + 1))
@@ -3370,9 +3339,9 @@ export default (e) => {
                                 info.velocity[i].y = 0.2 * (1 + currentSpeed);
                                 info.velocity[i].z = (Math.random() - 0.5) * 0.1 * (1 + currentSpeed);
                                 positionsAttribute.setXYZ(  i, 
-                                                            localPlayer.position.x + localVector2.x * 0.05 + info.velocity[i].x + playerDir.x * 0.35,
-                                                            waterSurfacePos.y - 0.1 * Math.random(),
-                                                            localPlayer.position.z + localVector2.z * 0.05 + info.velocity[i].z + playerDir.z * 0.35
+                                                            localPlayer.position.x + localVector2.x * 0.05 + info.velocity[i].x + playerDir.x * 0.35 - app.position.x,
+                                                            waterSurfacePos.y - 0.1 * Math.random() - app.position.y,
+                                                            localPlayer.position.z + localVector2.z * 0.05 + info.velocity[i].z + playerDir.z * 0.35 - app.position.z
                                 );
                                 info.velocity[i].divideScalar(10);
                                 info.acc[i] = -0.001 - currentSpeed * 0.0015;
@@ -3395,9 +3364,9 @@ export default (e) => {
                                 info.velocity[i].y = 0.2 * (1 + currentSpeed);
                                 info.velocity[i].z = (Math.random() - 0.5) * 0.1 * (1 + currentSpeed);
                                 positionsAttribute.setXYZ(  i, 
-                                                            localPlayer.position.x - localVector2.x * 0.05 + info.velocity[i].x + playerDir.x * 0.35,
-                                                            waterSurfacePos.y - 0.1 * Math.random(),
-                                                            localPlayer.position.z - localVector2.z * 0.05 + info.velocity[i].z + playerDir.z * 0.35
+                                                            localPlayer.position.x - localVector2.x * 0.05 + info.velocity[i].x + playerDir.x * 0.35 - app.position.x,
+                                                            waterSurfacePos.y - 0.1 * Math.random() - app.position.y,
+                                                            localPlayer.position.z - localVector2.z * 0.05 + info.velocity[i].z + playerDir.z * 0.35 - app.position.z
                                 );
                                 info.velocity[i].divideScalar(10);
                                 info.acc[i] = -0.001 - currentSpeed * 0.0015;
@@ -3645,8 +3614,8 @@ export default (e) => {
       
       let playEffectSw=0;
       useFrame(({timestamp}) => {
-          if (contactWater && waterSurfacePos.y < localPlayer.position.y){
-              if(playEffectSw === 0)
+          if (contactWater){
+              if(playEffectSw === 0 && waterSurfacePos.y < localPlayer.position.y)
                   playEffectSw = 1;
           }
           else{
@@ -3670,9 +3639,9 @@ export default (e) => {
                       info.velocity[i].y = 0.15 * Math.random();
                       info.velocity[i].z = Math.cos(i) * .1 + (Math.random() - 0.5) * 0.01;
                       positionsAttribute.setXYZ(  i, 
-                                                  localPlayer.position.x + info.velocity[i].x,
-                                                  waterSurfacePos.y + 0.1 * Math.random(),
-                                                  localPlayer.position.z + info.velocity[i].z
+                                                  localPlayer.position.x + info.velocity[i].x - app.position.x,
+                                                  waterSurfacePos.y + 0.1 * Math.random() - app.position.y,
+                                                  localPlayer.position.z + info.velocity[i].z - app.position.z
                       );
                       info.velocity[i].divideScalar(5);
                       scalesAttribute.setX(i, 0.8);
@@ -3680,7 +3649,7 @@ export default (e) => {
                       brokenAttribute.setX(i, 0.2 + Math.random() * 0.25);
                       if(secondSplash === 2){
                           secondSplash = 0;
-                          secondSplashPos.set(localPlayer.position.x, waterSurfacePos.y, localPlayer.position.z);
+                          secondSplashPos.set(localPlayer.position.x - app.position.x, waterSurfacePos.y - app.position.y, localPlayer.position.z - app.position.z);
                       }
                   }
                   if(scalesAttribute.getX(i) >= 0.8 &&  scalesAttribute.getX(i) < 2.5){
@@ -4127,7 +4096,7 @@ export default (e) => {
                   float broken = abs( sin( 1.0 - vBroken ) ) - texture2D( noiseMap, vUv ).g;
                   if ( broken < 0.0001 ) discard;
                   if(gl_FragColor.a > 0.){
-                        gl_FragColor = vec4(0.6, 0.6, 0.6, 1.0);
+                        gl_FragColor = vec4(0.9, 0.9, 0.9, 1.0);
                   }
                   else{
                         discard;
@@ -4267,10 +4236,10 @@ export default (e) => {
                     );
                     
                     gl_FragColor = bubble;
-                    if(gl_FragColor.a < 0.25){
+                    if(gl_FragColor.a < 0.5){
                         discard;
                     }
-                    gl_FragColor.rgb *= 2.;
+                    gl_FragColor.rgb *= 5.;
                 ${THREE.ShaderChunk.logdepthbuf_fragment}
                 }
             `,
@@ -4342,14 +4311,14 @@ export default (e) => {
       let jumpSw=0;
       
       useFrame(({timestamp}) => {
-          if (contactWater && waterSurfacePos.y < localPlayer.position.y){
-              if(jumpSw===0)
-                  jumpSw=1;
-          }
-          else{
-              if(jumpSw=2)
-                  jumpSw=0;
-          }
+        if (contactWater){
+            if(jumpSw === 0 && waterSurfacePos.y < localPlayer.position.y)
+                jumpSw = 1;
+        }
+        else{
+            if(jumpSw === 2)
+                jumpSw = 0;
+        }
         if (dropletMesh && rippleMesh) {
           const rippleOpacityAttribute = rippleMesh.geometry.getAttribute('opacity');
           const rippleBrokenAttribute = rippleMesh.geometry.getAttribute('broken');
@@ -4440,13 +4409,17 @@ export default (e) => {
           rippleWaveFreqAttribute.needsUpdate = true;
           rippleMesh.material.uniforms.uTime.value=timestamp/1000;
           if(jumpSw==1){
-              dropletgroup.position.copy(localPlayer.position);
-              dropletRipplegroup.position.copy(localPlayer.position);
+              dropletgroup.position.x = localPlayer.position.x - app.position.x;
+              dropletgroup.position.y = waterSurfacePos.y - app.position.y;
+              dropletgroup.position.z = localPlayer.position.z - app.position.z;
+
+              dropletRipplegroup.position.x = localPlayer.position.x - app.position.x;
+              dropletRipplegroup.position.y = waterSurfacePos.y - app.position.y;
+              dropletRipplegroup.position.z = localPlayer.position.z - app.position.z;
               jumpSw=2;
           }
           
-          dropletgroup.position.y = waterSurfacePos.y;
-          dropletRipplegroup.position.y = waterSurfacePos.y;
+          
   
   
       }
@@ -4600,7 +4573,7 @@ export default (e) => {
                     vUv
                 );
                 if(splash.r > 0.1){
-                    gl_FragColor = vec4(0.6, 0.6, 0.6, 1.0);
+                    gl_FragColor = vec4(0.8, 0.8, 0.8, 1.0);
                 }
                 else{
                     discard;
@@ -4657,12 +4630,12 @@ export default (e) => {
     let jumpSw=0;
     useFrame(({timestamp}) => {
         if (contactWater){
-            if(jumpSw===0)
-                jumpSw=1;
+            if(jumpSw === 0 && waterSurfacePos.y < localPlayer.position.y)
+                jumpSw = 1;
         }
         else{
-            if(jumpSw=2)
-                jumpSw=0;
+            if(jumpSw === 2)
+                jumpSw = 0;
         }
        
         
@@ -4696,15 +4669,13 @@ export default (e) => {
 
             }
             
-            
-            
             if(jumpSw==1){
-                group.position.copy(localPlayer.position);
+                group.position.x = localPlayer.position.x - app.position.x;
+                group.position.y = waterSurfacePos.y - app.position.y;
+                group.position.z = localPlayer.position.z - app.position.z;
                 jumpSw=2;
             }
             
-            
-            group.position.y = waterSurfacePos.y + 0.01;
             positionsAttribute.needsUpdate = true;
             opacityAttribute.needsUpdate = true;
             scalesAttribute.needsUpdate = true;
@@ -4869,12 +4840,12 @@ export default (e) => {
         if (contactWater){
             if(playEffectSw === 0 && waterSurfacePos.y < localPlayer.position.y){
                 playEffectSw = 1;
-                if(fallindSpeed > 5){
+                if(fallindSpeed > 1){
                     // todo: Commented temporarily for merging, to prevent reporting error, need to be restored.
-                    // let regex = new RegExp('^water/jump_water[0-9]*.wav$');
-                    // const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
-                    // const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
-                    // sounds.playSound(audioSpec);
+                    let regex = new RegExp('^water/jump_water[0-9]*.wav$');
+                    const candidateAudios = soundFiles.water.filter(f => regex.test(f.name));
+                    const audioSpec = candidateAudios[Math.floor(Math.random() * candidateAudios.length)];
+                    sounds.playSound(audioSpec);
                 }
             }
                 
@@ -4896,8 +4867,9 @@ export default (e) => {
             //         splashMesh.material.uniforms.vBroken.value = splashMesh.material.uniforms.vBroken.value + 0.02;
             // }
             if(playEffectSw === 1 && fallindSpeed > 6){
-                group.position.copy(localPlayer.position);
-                group.position.y = waterSurfacePos.y;
+                group.position.x = localPlayer.position.x - app.position.x;
+                group.position.y = waterSurfacePos.y - app.position.y;
+                group.position.z = localPlayer.position.z - app.position.z;
                 splashMesh.material.uniforms.vBroken.value = 0.1;
                 splashMesh.scale.set(0.2, 1, 0.2);
                 splashMesh.material.uniforms.uTime.value = 120;
