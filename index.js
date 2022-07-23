@@ -26,6 +26,7 @@ const sounds = useSound();
 const soundFiles = sounds.getSoundFiles();
 
 let reflectionSsrPass = null;
+let foamPass = null;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const textureLoader = new THREE.TextureLoader();
@@ -160,168 +161,224 @@ class WaterMesh extends BatchedMesh {
     //   material.uniforms.uLightBasePosition.value.copy(coord);
     //   material.uniforms.uLightBasePosition.needsUpdate = true;
     // });
+
+    
     
     const material = new THREE.ShaderMaterial({
-      uniforms: {
+        defines: {
+          DEPTH_PACKING: 1,
+          ORTHOGRAPHIC_CAMERA: 0
+        },
+        uniforms: {
           uTime: {
-              type: "f",
-              value: 0.0
+            value: 0
           },
           uUJump: {
-              type: "f",
-              value: 0.24
+            type: "f",
+            value: 0.24
           },
           uVJump: {
-              type: "f",
-              value: 0.208
+            type: "f",
+            value: 0.208
           },
           uTiling: {
-              type: "f",
-              value: 2
+            type: "f",
+            value: 2
           },
           uSpeed: {
-              type: "f",
-              value: 0.5
+            type: "f",
+            value: 0.5
           },
           uFlowStrength: {
-              type: "f",
-              value: 0.25
+            type: "f",
+            value: 0.25
           },
           uFlowOffset: {
-              type: "f",
-              value: -1.5
+            type: "f",
+            value: -1.5
           },
           sunPosition: {
-              value: new THREE.Vector3(200.0, 1.0, -600.)
-          },
-          sunDirection: {
-              value: new THREE.Vector3(200.0, 1.0, -600.)
+            value: new THREE.Vector3(200.0, 1.0, -600.)
           },
           playerPosition: {
-              value: new THREE.Vector3()
+            value: new THREE.Vector3()
           },
           playerDirection: {
-              value: new THREE.Vector3()
+            value: new THREE.Vector3()
           },
           waterDerivativeHeightTexture: {
-              value: waterNoiseTexture2
+            value: waterDerivativeHeightTexture
           },
           waterNoiseTexture: {
-              value: waterNoiseTexture
+            value: waterNoiseTexture
           },
           flowmapTexture: {
-              value: flowmapTexture
+            value: flowmapTexture
           },
-          waterNormalTexture1:{
-            value: waterNormalTexture1
+          threshold: {
+            value: 0.1
           },
-          waterNormalTexture2:{
-            value: waterNormalTexture2
-          }
-
-      },
-      vertexShader: `\
-          ${THREE.ShaderChunk.common}
-          ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
-          
-          uniform float uTime;
-
-          varying vec3 vPos;
-          varying vec2 vUv;
-          uniform sampler2D waterNormalTexture1;
-          uniform sampler2D waterNormalTexture2;
-          
-          void main() {
-              vPos = position;
-              vUv = uv;
-              vec3 pos = position;
-              vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
-              vec4 viewPosition = viewMatrix * modelPosition;
-              vec4 projectionPosition = projectionMatrix * viewPosition;
-      
-              gl_Position = projectionPosition;
-              ${THREE.ShaderChunk.logdepthbuf_vertex}
-          }`,
-      fragmentShader: `\
-          
-          
-          ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
-          #include <common>
-          #include <packing>
-          varying vec3 vPos;
-          varying vec2 vUv;
-          uniform mat4 modelMatrix;
-
-          uniform float uTime;
-          uniform float uUJump;
-          uniform float uVJump;
-          uniform float uTiling;
-          uniform float uSpeed;
-          uniform float uFlowStrength;
-          uniform float uFlowOffset;
-          uniform vec3 sunPosition;
-          uniform vec3 playerPosition;
-          uniform vec3 playerDirection;
-          uniform vec3 sunDirection;
-          
-
-          
-        //   uniform sampler2D waterDerivativeHeightTexture;
-        //   uniform sampler2D waterNoiseTexture;
-        //   uniform sampler2D flowmapTexture;
-          uniform sampler2D waterNormalTexture1;
-          uniform sampler2D waterNormalTexture2;
-
-        vec4 getNoise( vec2 uv ) {
-            vec2 uv0 = ( uv / 103.0 ) + vec2(uTime / 34.0, uTime / 58.0);
-            vec2 uv1 = uv / 107.0-vec2( uTime / -38.0, uTime / 64.0 );
-            vec2 uv2 = uv / vec2( 8907.0, 9803.0 ) + vec2( uTime / 202.0, uTime / 194.0 );
-            vec2 uv3 = uv / vec2( 1091.0, 1027.0 ) - vec2( uTime / 218.0, uTime / -226.0 );
-            vec4 noise = texture2D( waterNormalTexture1, uv0 ) +
-                texture2D( waterNormalTexture1, uv1 ) +
-                texture2D( waterNormalTexture2, uv2 ) +
-                texture2D( waterNormalTexture2, uv3 );
-            return noise * 0.5 - 1.0;
-        }
-        void sunLight( const vec3 surfaceNormal, const vec3 eyeDirection, float shiny, float spec, float diffuse, inout vec3 diffuseColor, inout vec3 specularColor ) {
-            vec3 reflection = normalize( reflect( -sunDirection, surfaceNormal ) );
-            float direction = max( 0.0, dot( eyeDirection, reflection ) );
-            specularColor += pow( direction, shiny ) * vec3(0.3, 0.3, 0.3) * spec;
-            diffuseColor += max( dot( sunDirection, surfaceNormal ), 0.0 ) * vec3(0.3, 0.3, 0.3) * diffuse;
-        }
-          void main() {
-            vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
-            vec4 noise = getNoise( worldPosition.xz * 2.);
-            vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
-
-            vec3 diffuseLight = vec3(1.0);
-            vec3 specularLight = vec3(0.1, 0.6, 0.6);
-            vec3 worldToEye = worldPosition.xyz - cameraPosition;
-            vec3 eyeDirection = normalize( worldToEye );
-            sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );
-            float distance = length(worldToEye);
-            // vec2 distortion = surfaceNormal.xz * ( 0.001 + 1.0 / distance ) * distortionScale;
-
-            float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
-            float rf0 = 0.3;
-            float reflectance = rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 );
-            vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * vec3(1.0, 1.0, 1.0);
-            vec3 albedo = ( vec3(0.3, 0.3, 0.3) * diffuseLight * 0.025 + scatter );
-            vec3 outgoingLight = albedo;
-            gl_FragColor = (vec4( outgoingLight, 0.95 ) * vec4(0.048, 0.3, 0.384, 1.0)) + + vec4(0.0282, 0.470, 0.431, 0.);
+          tDudv: {
+            value: null
+          },
+          tDepth: {
+            value: null
+          },
+          cameraNear: {
+            value: 0
+          },
+          cameraFar: {
+            value: 0
+          },
+          resolution: {
+            value: new THREE.Vector2()
+          },
+        },
+        vertexShader: `\
             
- 
-            ${THREE.ShaderChunk.logdepthbuf_fragment}
-          }
-      `,
-      side: THREE.DoubleSide,
-      transparent: true,
-      depthFunc: THREE.LessDepth,
-    //   depthWrite: false,
-    //   blending: THREE.AdditiveBlending,
+            ${THREE.ShaderChunk.common}
+            ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+  
+            varying vec2 vUv;
+            varying vec3 vPos;
+            
+            void main() {
+                vUv = uv;
+  
+                vPos = position;
+                vec3 pos = position;
+                vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+                vec4 viewPosition = viewMatrix * modelPosition;
+                vec4 projectionPosition = projectionMatrix * viewPosition;
+        
+                gl_Position = projectionPosition;
+                ${THREE.ShaderChunk.logdepthbuf_vertex}
+            }
+        `,
+        fragmentShader: `\
+            ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
+            #include <common>
+            #include <packing>
+            uniform mat4 modelMatrix;
+
+
+            uniform float uTime;
+            uniform float uUJump;
+            uniform float uVJump;
+            uniform float uTiling;
+            uniform float uSpeed;
+            uniform float uFlowStrength;
+            uniform float uFlowOffset;
+            uniform vec3 sunPosition;
+            uniform vec3 playerPosition;
+            uniform vec3 playerDirection;
+            uniform sampler2D waterDerivativeHeightTexture;
+            uniform sampler2D waterNoiseTexture;
+            uniform sampler2D flowmapTexture;
 
   
-    });
+            varying vec2 vUv;
+            varying vec3 vPos;
+            uniform sampler2D tDepth;
+            uniform sampler2D tDudv;
+            uniform float cameraNear;
+            uniform float cameraFar;
+            uniform float threshold;
+            uniform vec2 resolution;
+  
+            float getDepth( const in vec2 screenPosition ) {
+                return unpackRGBAToDepth( texture2D( tDepth, screenPosition ) );
+            }
+  
+            float getViewZ( const in float depth ) {
+                return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
+            }
+            float frac(float v)
+            {
+                return v - floor(v);
+            }
+            vec3 FlowUVW (vec2 uv, vec2 flowVector, vec2 jump, float flowOffset, float tiling, float time,  bool flowB) {
+                float phaseOffset = flowB ? 0.5 : 0.;
+                float progress = frac(time + phaseOffset);
+                vec3 uvw;
+                uvw.xy = uv - flowVector * (progress + flowOffset);
+                uvw.xy *= tiling;
+                uvw.xy += phaseOffset;
+                uvw.xy += (time - progress) * jump;
+                uvw.z = 1. - abs(1. - 2. * progress);
+                return uvw;
+            }
+            vec3 UnpackDerivativeHeight (vec4 textureData) {
+                vec3 dh = textureData.agb;
+                dh.xy = dh.xy * 2. - 1.;
+                return dh;
+            }
+            
+            float shineDamper = 10.;
+            float reflectivity = 0.1;
+            void main() {
+              vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
+              vec3 sunToPlayer = normalize(sunPosition - playerPosition); 
+              vec3 worldToEye = vec3(playerPosition.x + sunToPlayer.x * 100., playerPosition.y, playerPosition.z + sunToPlayer.z * 100.)-worldPosition.xyz;
+              
+              vec3 eyeDirection = normalize( worldToEye );
+            //   vec3 eyeDirection = normalize(worldPosition.xyz - cameraPosition);
+              vec2 uv = worldPosition.xz * 0.05;
+              vec2 flowmap = texture2D(flowmapTexture, uv / 5.).rg * 2. - 1.;
+              flowmap *= uFlowStrength;
+              float noise = texture2D(flowmapTexture, uv).a;
+              float time = uTime * uSpeed + noise;
+              vec2 jump = vec2(uUJump, uVJump);
+              vec3 uvwA = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, false);
+              vec3 uvwB = FlowUVW(uv, flowmap, jump, uFlowOffset, uTiling, time, true);
+              vec3 dhA = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwA.xy * 0.5)) * uvwA.z * 5.5;
+              vec3 dhB = UnpackDerivativeHeight(texture2D(waterDerivativeHeightTexture, uvwB.xy * 0.5)) * uvwB.z * 5.5;
+              vec3 surfaceNormal = normalize(vec3(-(dhA.xy + dhB.xy), 1.));
+              vec3 fromSunVector = worldPosition.xyz - (sunPosition + playerPosition);
+              vec3 reflectedLight = reflect(normalize(fromSunVector), surfaceNormal);
+              float specular = max(dot(reflectedLight, eyeDirection), 0.0);
+              specular = pow(specular, shineDamper);
+              vec3 specularHighlight = vec3(0.0282 * 0.9, 0.431 * 0.9, 0.47 * 0.9) * specular * reflectivity;
+                 
+              vec4 texA = texture2D(waterNoiseTexture, uvwA.xy) * uvwA.z;
+              vec4 texB = texture2D(waterNoiseTexture, uvwB.xy) * uvwB.z;
+              gl_FragColor = (texA + texB) * vec4(0.048 / 1.5, 0.24 / 1.5, 0.384 / 1.5, 0.97) + vec4(0.0282, 0.431, 0.47, 0.);
+              gl_FragColor.rgb /= 3.;
+              gl_FragColor += vec4( specularHighlight, 0.0 );
+
+
+
+
+              // foam
+              vec2 screenUV = gl_FragCoord.xy / resolution;
+  
+              float fragmentLinearEyeDepth = getViewZ( gl_FragCoord.z );
+              float linearEyeDepth = getViewZ( getDepth( screenUV ) );
+      
+              float diff = saturate( fragmentLinearEyeDepth - linearEyeDepth );
+              if(diff > 0.){
+                vec2 channelA = texture2D( tDudv, vec2(0.25 * worldPosition.x + uTime * 0.04, 0.5 * worldPosition.z - uTime * 0.03) ).rg;
+				vec2 channelB = texture2D( tDudv, vec2(0.5 * worldPosition.x - uTime * 0.05, 0.35 * worldPosition.z + uTime * 0.04) ).rg;
+                vec2 displacement = (channelA + channelB) * 0.5;
+                displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
+                diff += displacement.x;
+
+
+                // vec2 displacement = texture2D( tDudv, ( worldPosition.xz * 1.0 ) - uTime * 0.05 ).rg;
+                // displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
+                // diff += displacement.x;
+        
+                gl_FragColor = mix( vec4(1.0, 1.0, 1.0, gl_FragColor.a), gl_FragColor, step( 0.05, diff ) );
+              }
+              
+              
+              ${THREE.ShaderChunk.logdepthbuf_fragment}
+            }
+        `,
+        side: THREE.DoubleSide,
+        transparent: true
+        // fog: true
+      });
     
     // const {renderer} = useInternals();
     // renderer.context.depthFunc(renderer.context.LESS)
@@ -756,7 +813,7 @@ export default (e) => {
   const cameraWaterSurfacePos = new THREE.Vector3(0, 63, 0);
   let contactWater = false;
   //let wholeBelowwWater = false;
-  let floatOnWater = false;
+//   let floatOnWater = false;
   let cameraDir = new THREE.Vector3();
   let playerDir = new THREE.Vector3();
   const playerHeadPos = new THREE.Vector3();
@@ -973,7 +1030,21 @@ export default (e) => {
         }
     }
     
-    
+    const pixelRatio = renderer.getPixelRatio();
+  
+    const renderTarget = new THREE.WebGLRenderTarget(
+      window.innerWidth * pixelRatio,
+      window.innerHeight * pixelRatio
+    );
+    renderTarget.texture.minFilter = THREE.NearestFilter;
+    renderTarget.texture.magFilter = THREE.NearestFilter;
+    renderTarget.texture.generateMipmaps = false;
+    renderTarget.stencilBuffer = false;
+  
+    const depthMaterial = new THREE.MeshDepthMaterial();
+    depthMaterial.depthPacking = THREE.RGBADepthPacking;
+    depthMaterial.blending = THREE.NoBlending;
+
     useFrame(({timestamp, timeDiff}) => {
       if (!!tracker && !app.getComponent('renderPosition')) {
         const localPlayer = useLocalPlayer();
@@ -989,8 +1060,18 @@ export default (e) => {
                         if(pass.constructor.name === 'WebaWaterPass'){
                             pass._selects.push(generator.getMeshes()[0]);
                             pass.opacity = 0.12;
-                            pass.invisibleSelects.push(localPlayer.avatar.app);
                             reflectionSsrPass = pass;
+                        }
+                        if(pass.constructor.name === 'WebaverseRenderPass'){
+                            pass.foamDepthMaterial = depthMaterial;
+                            pass.foamRenderTarget = renderTarget;
+                            pass.water = generator.getMeshes()[0];
+                            pass.scene = scene;
+                            pass.camera = camera;
+                            pass.foamInvisibleList.push(localPlayer.avatar.app);
+                            pass.foamInvisibleList.push(generator.getMeshes()[0]);
+                            foamPass = pass;
+                            console.log(pass);
                         }
                     }
                     alreadySetComposer = true;
@@ -1000,9 +1081,8 @@ export default (e) => {
             if(reflectionSsrPass){
                 reflectionSsrPass.ssrMaterial.uniforms.uTime.value = timestamp / 1000;
                 reflectionSsrPass.ssrMaterial.uniforms.distortionTexture.value = dudvMap;
-                reflectionSsrPass.combineMaterial.uniforms.dudvMap.value = dudvMap2;
-                reflectionSsrPass.combineMaterial.uniforms.time.value = timestamp / 1000;
             }
+            
 
             let playerIsOnSurface = false;
             let cameraIsOnSurface = false;
@@ -1229,7 +1309,16 @@ export default (e) => {
             generator.getMeshes()[0].material.uniforms.uTime.value = timestamp / 1000;
             generator.getMeshes()[0].material.uniforms.playerPosition.value.copy(localPlayer.position);
             generator.getMeshes()[0].material.uniforms.playerDirection.value.copy(playerDir);
+
             
+            generator.getMeshes()[0].material.uniforms.cameraNear.value = camera.near;
+            generator.getMeshes()[0].material.uniforms.cameraFar.value = camera.far;
+            generator.getMeshes()[0].material.uniforms.resolution.value.set(
+                window.innerWidth * window.devicePixelRatio,
+                window.innerHeight * window.devicePixelRatio
+            );
+            generator.getMeshes()[0].material.uniforms.tDudv.value = dudvMap2;
+            generator.getMeshes()[0].material.uniforms.tDepth.value = renderTarget.texture;
                 
                 
         }
@@ -1306,7 +1395,7 @@ export default (e) => {
             
 
             void main() {
-                gl_FragColor = vec4(0.0141, 0.235, 0.2355, 0.7);
+                gl_FragColor = vec4(0.0141, 0.235, 0.25, 0.7);
                 if(!contactWater || vPos.y > cameraWaterSurfacePos.y)
                     discard;
             ${THREE.ShaderChunk.logdepthbuf_fragment}
@@ -1323,11 +1412,12 @@ export default (e) => {
     let cameraHasMask = false;
     let alreadySetComposer = false;
     useFrame(({timestamp}) => {
-        if(!alreadySetComposer){
-            if(reflectionSsrPass){
-                // reflectionSsrPass.invisibleSelects.push(mask);
-                alreadySetComposer = true;
-            }
+        if(!alreadySetComposer && foamPass && renderSettings.findRenderSettings(scene)){
+            renderSettings.findRenderSettings(scene).fog.color.r = 4 / 255;
+            renderSettings.findRenderSettings(scene).fog.color.g = 41.5 / 255;
+            renderSettings.findRenderSettings(scene).fog.color.b = 44.5 / 255;
+            foamPass.foamInvisibleList.push(mask);
+            alreadySetComposer = true;
         }
        
       
@@ -4836,8 +4926,9 @@ export default (e) => {
     let alreadySetComposer = false;
     useFrame(({timestamp}) => {
         if(!alreadySetComposer){
-            if(splashMesh && reflectionSsrPass){
+            if(splashMesh && reflectionSsrPass && foamPass){
                 reflectionSsrPass._selects.push(splashMesh);
+                foamPass.foamInvisibleList.push(splashMesh);
                 alreadySetComposer = true;
             }
         }
