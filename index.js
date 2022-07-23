@@ -974,20 +974,6 @@ export default (e) => {
         }
     }
     
-    const pixelRatio = renderer.getPixelRatio();
-  
-    const renderTarget = new THREE.WebGLRenderTarget(
-      window.innerWidth * pixelRatio,
-      window.innerHeight * pixelRatio
-    );
-    renderTarget.texture.minFilter = THREE.NearestFilter;
-    renderTarget.texture.magFilter = THREE.NearestFilter;
-    renderTarget.texture.generateMipmaps = false;
-    renderTarget.stencilBuffer = false;
-  
-    const depthMaterial = new THREE.MeshDepthMaterial();
-    depthMaterial.depthPacking = THREE.RGBADepthPacking;
-    depthMaterial.blending = THREE.NoBlending;
 
     useFrame(({timestamp, timeDiff}) => {
       if (!!tracker && !app.getComponent('renderPosition')) {
