@@ -154,7 +154,7 @@ class WaterMesh extends BatchedMesh {
     );
     const {geometry} = allocator;
 
-    const lightMapper = procGenInstance.getLightMapper();
+    // const lightMapper = procGenInstance.getLightMapper();
     // lightMapper.addEventListener('update', e => {
     //   const {coord} = e.data;
     //   material.uniforms.uLightBasePosition.value.copy(coord);
@@ -338,7 +338,7 @@ class WaterMesh extends BatchedMesh {
     this.allocator = allocator;
     this.physicsObjects = [];
 
-    this.lightMapper = lightMapper;
+    // this.lightMapper = lightMapper;
 
     this.localVector5 = new THREE.Vector3();
     this.physicsObjectToChunkMap = new Map();
@@ -520,7 +520,7 @@ class WaterMesh extends BatchedMesh {
       _handlePhysics();
     }
   }
-  updateCoord(min2xCoord) {
+  /* updateCoord(min2xCoord) {
     // XXX only do this on light mapper update
     // XXX needs to apply to the terrain mesh too, though the terrain mesh is driving the lighting (maybe rethink this)
     // XXX create a new lighting app which tracks the lighting only
@@ -531,7 +531,7 @@ class WaterMesh extends BatchedMesh {
       );
       this.material.uniforms.uLightBasePosition.needsUpdate = true;
     }
-  }
+  } */
 }
 
 class WaterChunkGenerator {
