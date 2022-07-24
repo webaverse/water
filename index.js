@@ -451,23 +451,23 @@ class WaterMesh extends BatchedMesh {
         // signal.addEventListener('abort', (e) => {
         //   this.allocator.free(geometryBinding);
         // });
-        let called = false;
+        // let called = false;
         const onchunkremove = e => {
-          const {chunk: removeChunk} = e.data;
-          if (chunk.equalsNodeLod(removeChunk)) {
-            if (!called) {
+        //   const {chunk: removeChunk} = e;
+        //   if (chunk.equalsNodeLod(removeChunk)) {
+            /* if (!called) {
               called = true;
             } else {
               console.warn('double destroy');
               debugger;
-            }
+            } */
 
             this.allocator.free(geometryBinding);
           
-            tracker.removeEventListener('chunkremove', onchunkremove);
-          }
+            tracker.offChunkRemove(chunk, onchunkremove);
+        //   }
         };
-        tracker.addEventListener('chunkremove', onchunkremove);
+        tracker.onChunkRemove(chunk, onchunkremove);
       };
       _handleMesh();
 
@@ -493,17 +493,9 @@ class WaterMesh extends BatchedMesh {
           (chunk.z + 0.5) * chunkWorldSize
         ).applyMatrix4(this.matrixWorld);
 
-        let called = false;
-          const onchunkremove = e => {
-            const {chunk: removeChunk} = e.data;
-            if (chunk.equalsNodeLod(removeChunk)) {
-              if (!called) {
-                called = true;
-              } else {
-                console.warn('double destroy');
-                debugger;
-              }
-
+        const onchunkremove = () => {
+            // const {chunk: removeChunk} = e;
+            // if (chunk.equalsNodeLod(removeChunk)) {
               this.physics.removeGeometry(physicsObject);
               this.physicsObjects.splice(
                 this.physicsObjects.indexOf(physicsObject),
@@ -511,10 +503,10 @@ class WaterMesh extends BatchedMesh {
               );
               this.physicsObjectToChunkMap.delete(physicsObject);
 
-              tracker.removeEventListener('chunkremove', onchunkremove);
-            }
+              tracker.offChunkRemove(chunk, onchunkremove);
+            // }
         }
-        tracker.addEventListener('chunkremove', onchunkremove);
+        tracker.onChunkRemove(chunk, onchunkremove);
 
         
         // signal.addEventListener('abort', (e) => {
@@ -836,12 +828,11 @@ export default (e) => {
             app.add(tracker.debugMesh);
             tracker.debugMesh.updateMatrixWorld();
         }
-        tracker.addEventListener('coordupdate', coordupdate);
-        tracker.addEventListener('chunkdatarequest', chunkdatarequest);
-        tracker.addEventListener('chunkadd', chunkadd);
-        // tracker.addEventListener('chunkremove', chunkremove);
-        // tracker.addEventListener('chunkrelod', chunkrelod);
-        
+        // tracker.addEventListener('chunkdatarequest', chunkdatarequest);
+        // tracker.addEventListener('chunkadd', chunkadd);
+        tracker.onChunkDataRequest(chunkdatarequest);
+        tracker.onChunkAdd(chunkadd);
+
         const renderPosition = app.getComponent('renderPosition');
         if (renderPosition) {
             tracker.update(localVector.fromArray(renderPosition));
@@ -866,13 +857,8 @@ export default (e) => {
     app.getPhysicsObjects = () => generator ? generator.getPhysicsObjects() : [];
     app.getChunkForPhysicsObject = (physicsObject) => generator ? generator.getChunkForPhysicsObject(physicsObject) : null;
   
-    const coordupdate = (e) => {
-      const {coord} = e.data;
-      generator.getMeshes()[0].updateCoord(coord);
-    };
     const chunkdatarequest = (e) => {
-       
-        const {chunk, waitUntil, signal} = e.data;
+        const {chunk, waitUntil, signal} = e;
     
         // console.log('lod tracker chunkdatarequest', chunk);
     
@@ -888,7 +874,7 @@ export default (e) => {
         waitUntil(loadPromise);
     };
     const chunkadd = (e) => {
-        const {renderData, chunk} = e.data;
+        const {renderData, chunk} = e;
         generator.getMeshes()[0].drawChunk(chunk, renderData, tracker);
     };
     // const chunkadd = (e) => {
