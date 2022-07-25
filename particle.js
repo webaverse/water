@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { rippleVertex, rippleFragment } from './shaders/particleShader.js';
 import { lowerSplashVertex, lowerSplashFragment } from './shaders/particleShader.js';
 import { higherSplashVertex, higherSplashFragment } from './shaders/particleShader.js';
+import { dropletVertex, dropletFragment } from './shaders/particleShader.js';
+import { dropletRippleVertex, dropletRippleFragment } from './shaders/particleShader.js';
+import { floatingSplashVertex, floatingSplashFragment } from './shaders/particleShader.js';
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const {
@@ -10,7 +13,7 @@ const {
     useSound
 } = metaversefile;
 const sounds = useSound();
-const soundFiles = sounds.getSoundFiles();
+const soundFiles = sounds.getSoundFiles(); 
 
 const textureLoader = new THREE.TextureLoader();
 const bubbleTexture1 = textureLoader.load(`${baseUrl}/textures/Bubble3.png`);
@@ -78,9 +81,16 @@ class ParticleEffect{
         this.higherSplash = null;
         this.initHigherSplash();
 
+        this.droplet = null;
+        this.dropletRipple = null;
+        this.initDroplet();
+
         
         this.rippleMesh = null;
         this.initRipple();
+
+        this.floatingSplash = null;
+        this.initFloatingSplash();
 
 		
 
@@ -203,7 +213,7 @@ class ParticleEffect{
                         
                         scalesAttribute.setX(i, (0.8 +  (2 - i * 0.18)) / 7);
                         textureRotationAttribute.setX(i, Math.random() * 2);
-                        brokenAttribute.setX(i, Math.random() * 0.5 );
+                        brokenAttribute.setX(i, scalesAttribute.getX(i) * 1.2);
                     }
                     if(scalesAttribute.getX(i) < 0.8 +  (2 - i * 0.18)){
                         scalesAttribute.setX(i, scalesAttribute.getX(i) * 1.05);
@@ -239,6 +249,151 @@ class ParticleEffect{
             }
         }
         _handleHigherSplash();
+
+        const _handleDroplet = () =>{
+            if(this.droplet && this.dropletRipple){ 
+
+               
+                const rippleBrokenAttribute = this.dropletRipple.geometry.getAttribute('broken');
+                const rippleWaveFreqAttribute = this.dropletRipple.geometry.getAttribute('waveFreq');
+                const ripplePositionsAttribute = this.dropletRipple.geometry.getAttribute('positions');
+                const rippleScalesAttribute = this.dropletRipple.geometry.getAttribute('scales');
+                
+                const offsetAttribute = this.droplet.geometry.getAttribute('offset');
+                const positionsAttribute = this.droplet.geometry.getAttribute('positions');
+                const scalesAttribute = this.droplet.geometry.getAttribute('scales');
+                const particleCount = this.droplet.info.particleCount;
+                let falling = this.fallindSpeed > 10 ? 10 : this.fallindSpeed;
+                let dropletNum = particleCount * (falling / 10);
+                dropletNum /= 3;
+                falling = falling < 5 ? 7 : falling;
+                for (let i = 0; i < particleCount; i++){
+                    if(this.contactWater && this.lastContactWater !== this.contactWater){
+                        this.dropletgroup.position.copy(this.particlePosition);
+                        this.dropletRipplegroup.position.copy(this.particlePosition);
+                        if(this.fallindSpeed > 0.5){
+                            let rand = Math.random();
+                            scalesAttribute.setX(i, rand);
+                            positionsAttribute.setXYZ(i, 0, 0, 0);
+                            
+                            this.droplet.info.velocity[i].x = (Math.random() - 0.5) * 1 * (falling / 10);
+                            this.droplet.info.velocity[i].y = Math.random() * 1.6 * (falling / 10);
+                            this.droplet.info.velocity[i].z = (Math.random() - 0.5) * 1 * (falling / 10);
+                        
+                            this.droplet.info.velocity[i].divideScalar(20);
+                            
+                            this.droplet.info.alreadyHaveRipple[i] = false;
+                            if(i > dropletNum){
+                                scalesAttribute.setX(i, 0.001);
+                            }
+                            this.droplet.info.offset[i] = Math.floor(Math.random() * 29);
+                            this.droplet.info.startTime[i] = 0;
+                        }
+                    }
+                    if(positionsAttribute.getY(i) >= -100){
+                        this.droplet.info.velocity[i].add(this.droplet.info.acc);
+                        scalesAttribute.setX(i, scalesAttribute.getX(i) / 1.035);
+                        positionsAttribute.setXYZ(
+                                                    i,
+                                                    positionsAttribute.getX(i) + this.droplet.info.velocity[i].x,
+                                                    positionsAttribute.getY(i) + this.droplet.info.velocity[i].y,
+                                                    positionsAttribute.getZ(i) + this.droplet.info.velocity[i].z
+                        )
+                        this.droplet.info.startTime[i] = this.droplet.info.startTime[i] + 1;
+                        if(this.droplet.info.startTime[i] % 2 === 0)
+                            this.droplet.info.offset[i] += 1;
+                        if(this.droplet.info.offset[i] >= 30){
+                            this.droplet.info.offset[i] = 0;
+                        }
+                        offsetAttribute.setXY(i, (5 / 6) - Math.floor(this.droplet.info.offset[i] / 6) * (1. / 6.), Math.floor(this.droplet.info.offset[i] % 5) * 0.2);
+                    }
+                    if(positionsAttribute.getY(i) < 0 && !this.droplet.info.alreadyHaveRipple[i] && scalesAttribute.getX(i) > 0.001){
+                        scalesAttribute.setX(i, 0.0001);
+                        ripplePositionsAttribute.setXYZ(i, positionsAttribute.getX(i), 0.01, positionsAttribute.getZ(i));
+                        rippleScalesAttribute.setX(i, Math.random() * 0.2);
+                        rippleWaveFreqAttribute.setX(i, Math.random() * (i % 10));
+                        rippleBrokenAttribute.setX(i, Math.random() - 0.8);
+                        this.droplet.info.alreadyHaveRipple[i] = true;
+                    }
+                    rippleScalesAttribute.setX(i, rippleScalesAttribute.getX(i) + 0.02);
+                    if(rippleBrokenAttribute.getX(i) < 1){
+                        rippleBrokenAttribute.setX(i, rippleBrokenAttribute.getX(i) + 0.02);
+                    }
+                }
+                offsetAttribute.needsUpdate = true;
+                positionsAttribute.needsUpdate = true;
+                scalesAttribute.needsUpdate = true;
+
+                ripplePositionsAttribute.needsUpdate = true;
+                rippleScalesAttribute.needsUpdate = true;
+                rippleBrokenAttribute.needsUpdate = true;
+                rippleWaveFreqAttribute.needsUpdate = true;
+
+                this.dropletRipple.material.uniforms.uTime.value=timestamp/1000;
+                
+                this.droplet.material.uniforms.uTime.value = timestamp / 1000;
+                this.droplet.material.uniforms.cameraBillboardQuaternion.value.copy(this.camera.quaternion);
+            }
+        }
+        _handleDroplet();
+
+        const _handleFloatingSplash = () =>{
+            if(this.floatingSplash){ 
+                if(this.floatingSplash.info.currentIndex >= this.floatingSplash.info.particleCount){
+                    this.floatingSplash.info.currentIndex = 0;
+                }
+                const brokenAttribute = this.floatingSplash.geometry.getAttribute('broken');
+                const positionsAttribute = this.floatingSplash.geometry.getAttribute('positions');
+                const scalesAttribute = this.floatingSplash.geometry.getAttribute('scales');
+                const textureRotationAttribute = this.floatingSplash.geometry.getAttribute('textureRotation');
+                const particleCount = this.floatingSplash.info.particleCount;
+                for (let i = 0; i < particleCount; i++) {
+                    scalesAttribute.setX(i, scalesAttribute.getX(i) + 0.05 * (this.currentSpeed + 0.3));
+                    if(brokenAttribute.getX(i) < 1)
+                        brokenAttribute.setX(i, brokenAttribute.getX(i) + 0.005);
+                }
+                const emmitDelay = this.currentSpeed > 0.3 ? 100 : 200;
+                if(
+                    timestamp - this.floatingSplash.info.lastEmmitTime > emmitDelay * Math.pow((1.1 - this.currentSpeed), 0.3)  
+                    && (this.currentSpeed > 0.1 || this.fallindSpeed > 6)
+                ){
+                    if(
+                        (this.player.hasAction('swim') && this.player.getAction('swim').onSurface)
+                        ||(!this.player.hasAction('swim') && this.contactWater)
+                        || this.contactWater && this.lastContactWater !== this.contactWater
+                    ){
+                        let brokenDegree = this.currentSpeed > 0.3 ? 0.23 + 0.2 * Math.random() : 0.4 + 0.3 * Math.random();
+                        if(this.currentSpeed > 0.5){
+                            brokenDegree *= 1.3;
+                        }
+                        if(this.fallindSpeed > 6){
+                            brokenDegree = 0.15 + 0.2 * Math.random();
+                        }
+                        if(!this.player.hasAction('swim')){
+                            brokenDegree *= 1.1;
+                        }
+                        brokenAttribute.setX(this.floatingSplash.info.currentIndex, brokenDegree);
+                        scalesAttribute.setX(this.floatingSplash.info.currentIndex, 1.2 + Math.random() * 0.1);
+                        positionsAttribute.setXYZ(
+                            this.floatingSplash.info.currentIndex,
+                            this.particlePosition.x + 0.2 * this.playerDir.x + (Math.random() - 0.5) * 0.1, 
+                            this.particlePosition.y + 0.01, 
+                            this.particlePosition.z + 0.2 * this.playerDir.z + (Math.random() - 0.5) * 0.1
+                        );
+                        textureRotationAttribute.setX(this.floatingSplash.info.currentIndex, Math.random() * 2);
+                        this.floatingSplash.info.currentIndex++;
+                        this.floatingSplash.info.lastEmmitTime = timestamp;
+                    }
+
+                }
+                brokenAttribute.needsUpdate = true;
+                positionsAttribute.needsUpdate = true;
+                scalesAttribute.needsUpdate = true;
+                textureRotationAttribute.needsUpdate = true;
+                this.floatingSplash.material.uniforms.uTime.value = timestamp / 1000;
+            }
+        }
+        _handleFloatingSplash();
 
         
         this.app.updateMatrixWorld();
@@ -383,6 +538,149 @@ class ParticleEffect{
         this.app.add(this.higherSplash);
         
     }
+    initDroplet(){
+        this.dropletgroup = new THREE.Group();
+        const particleCount = 50;
+        const attributeSpecs = [];
+        attributeSpecs.push({name: 'scales', itemSize: 1});
+        attributeSpecs.push({name: 'offset', itemSize: 1});
+        const geometry2 = new THREE.PlaneGeometry(0.1, 0.1);
+        const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
+        const material= new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: {
+                    value: 0,
+                },
+                cameraBillboardQuaternion: {
+                    value: new THREE.Quaternion(),
+                },
+                bubbleTexture1: {
+                    value: bubbleTexture2,
+                },
+            },
+            vertexShader: dropletVertex,
+            fragmentShader: dropletFragment,
+            side: THREE.DoubleSide,
+            transparent: true,
+        });
+        this.droplet = new THREE.InstancedMesh(geometry, material, particleCount);
+        
+        this.droplet.info = {
+            velocity: [particleCount],
+            alreadyHaveRipple: [particleCount],
+            offset: [particleCount],
+            acc: new THREE.Vector3(0, -0.002, 0),
+            startTime: [particleCount],
+            particleCount: particleCount
+        }
+        for(let i = 0; i < particleCount; i++){
+            this.droplet.info.velocity[i] = new THREE.Vector3();
+            this.droplet.info.alreadyHaveRipple[i] = false;
+        }
+        this.dropletgroup.add(this.droplet);
+        this.app.add(this.dropletgroup);
+
+
+        this.dropletRipplegroup = new THREE.Group();
+        const rippleAttributeSpecs = [];
+        rippleAttributeSpecs.push({name: 'scales', itemSize: 1});
+        rippleAttributeSpecs.push({name: 'broken', itemSize: 1});
+        rippleAttributeSpecs.push({name: 'waveFreq', itemSize: 1});
+        
+        const geometry4 = new THREE.PlaneGeometry(0.45, 0.45);
+        const geometry3 = this._getGeometry(geometry4, rippleAttributeSpecs, particleCount);
+
+        const quaternions = new Float32Array(particleCount * 4);
+        const identityQuaternion = new THREE.Quaternion();
+        for (let i = 0; i < particleCount; i++) {
+            identityQuaternion.toArray(quaternions, i * 4);
+        }
+        const quaternionsAttribute = new THREE.InstancedBufferAttribute(quaternions, 4);
+        geometry3.setAttribute('quaternions', quaternionsAttribute);
+
+
+        const material2 = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: {
+                    value: 0,
+                },
+                noiseMap:{
+                    value: noiseMap
+                }
+            },
+            vertexShader: dropletRippleVertex,
+            fragmentShader: dropletRippleFragment,
+            side: THREE.DoubleSide,
+            transparent: true,
+        });
+        this.dropletRipple = new THREE.InstancedMesh(geometry3, material2, particleCount);
+        const euler = new THREE.Euler(-Math.PI / 2, 0, 0);
+        const quaternion = new THREE.Quaternion();
+        const quaternionAttribute = this.dropletRipple.geometry.getAttribute('quaternions');
+        for (let i = 0; i < particleCount; i++) {
+            quaternion.setFromEuler(euler);
+            quaternionAttribute.setXYZW(i, quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+        }
+        quaternionAttribute.needsUpdate = true;
+        
+        this.dropletRipplegroup.add(this.dropletRipple);
+        this.app.add(this.dropletRipplegroup);
+
+        
+        
+    }
+    initFloatingSplash(){
+        const particleCount = 30;
+        const attributeSpecs = [];
+        attributeSpecs.push({name: 'scales', itemSize: 1});
+        attributeSpecs.push({name: 'broken', itemSize: 1});
+        attributeSpecs.push({name: 'textureRotation', itemSize: 1});
+        const geometry2 = new THREE.PlaneGeometry(0.5, 0.5);
+        const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
+
+        const quaternions = new Float32Array(particleCount * 4);
+        const identityQuaternion = new THREE.Quaternion();
+        for (let i = 0; i < particleCount; i++) {
+            identityQuaternion.toArray(quaternions, i * 4);
+        }
+        const quaternionsAttribute = new THREE.InstancedBufferAttribute(quaternions, 4);
+        geometry.setAttribute('quaternions', quaternionsAttribute);
+
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: {
+                    value: 0,
+                },
+                noiseMap:{
+                    value: noiseMap
+                },
+                perlinnoise:{
+                    value: splashTexture
+                }
+            },
+            vertexShader: floatingSplashVertex,
+            fragmentShader: floatingSplashFragment,
+            side: THREE.DoubleSide,
+            transparent: true,
+        });
+        this.floatingSplash = new THREE.InstancedMesh(geometry, material, particleCount);
+        
+        this.floatingSplash.info = {
+            particleCount: particleCount,
+            currentIndex: 0,
+            lastEmmitTime: 0
+        }
+        const euler = new THREE.Euler(-Math.PI / 2, 0, 0);
+        const quaternion = new THREE.Quaternion();
+        const quaternionAttribute =  this.floatingSplash.geometry.getAttribute('quaternions');
+        for (let i = 0; i < particleCount; i++) {
+            quaternion.setFromEuler(euler);
+            quaternionAttribute.setXYZW(i, quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+        }
+        quaternionAttribute.needsUpdate = true;
+        this.app.add(this.floatingSplash);
+    }
+    
     _getGeometry = (geometry, attributeSpecs, particleCount) => {
         const geometry2 = new THREE.BufferGeometry();
         ['position', 'normal', 'uv'].forEach(k => {
