@@ -898,7 +898,7 @@ export default (e) => {
                   let result = generator.physics.raycast(localVector01, qt);
                   testContact1 = false;
                   for(const physicsObject of generator.getPhysicsObjects()){
-                    if(result.objectId === physicsObject.physicsId && result.distance <= ds){
+                    if(result && result.objectId === physicsObject.physicsId && result.distance <= ds){
                       testContact1 = true;
                       localVector07.set(result.point[0], result.point[1], result.point[2]);
                     }
@@ -933,7 +933,7 @@ export default (e) => {
                     let result = generator.physics.raycast(localVector01, qt);
                     testContact2 = true;
                     for(const physicsObject of generator.getPhysicsObjects()){
-                      if(result.objectId === physicsObject.physicsId && result.distance <= ds){
+                      if(result && result.objectId === physicsObject.physicsId && result.distance <= ds){
                         testContact2 = false;
                         localVector07.set(result.point[0], result.point[1], result.point[2]);
                       }
