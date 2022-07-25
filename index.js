@@ -256,11 +256,11 @@ class WaterMesh extends BatchedMesh {
                 float distance = length(worldToEye);
                 float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
                 
-                vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) * 0.2 ) * vec3(0.5, 0.5, 0.5);
+                vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) * 0.25 ) * vec3(0.5, 0.5, 0.5);
                 vec3 albedo = ( vec3(0.3, 0.3, 0.3) * diffuseLight * 0.025 + scatter );
                 vec3 outgoingLight = albedo;
-                gl_FragColor = (vec4( outgoingLight, 0.95 )) + + vec4(0.0282, 0.470, 0.431, 0.);
-
+                gl_FragColor = (vec4( outgoingLight, 0.95 )) + vec4(0.0282, 0.470, 0.431, 0.);
+                gl_FragColor.rgb /= 1.2;
                 // foam
                 vec2 screenUV = gl_FragCoord.xy / resolution;
     
@@ -807,8 +807,6 @@ export default (e) => {
 
     let alreadySetComposer = false;
 
-    
-    
     const pixelRatio = renderer.getPixelRatio();
   
     const renderTarget = new THREE.WebGLRenderTarget(
@@ -824,18 +822,13 @@ export default (e) => {
     depthMaterial.depthPacking = THREE.RGBADepthPacking;
     depthMaterial.blending = THREE.NoBlending;
 
-
-    const geometry = new THREE.SphereGeometry( 0.5, 32, 16 );
-    const material = new THREE.MeshBasicMaterial( { color: 0xffff00 , transparent:true, opacity:0.3} );
-    const sphere = new THREE.Mesh( geometry, material );
-    app.add( sphere );
-    const material2 = new THREE.MeshBasicMaterial( { color: 0xff0000, transparent:true, opacity:0.3} );
-    const sphere2 = new THREE.Mesh( geometry, material2 );
-    app.add( sphere2 );
     const testHDir = new THREE.Vector3();
 
     useFrame(({timestamp, timeDiff}) => {
-      particleEffect.update(waterWorldPosition);
+      particleEffect.update(timestamp);
+      particleEffect.particlePosition.set(localPlayer.position.x - waterWorldPosition.x, waterSurfacePos.y - waterWorldPosition.y, localPlayer.position.z - waterWorldPosition.z);
+      particleEffect.contactWater = contactWater;
+      particleEffect.fallindSpeed = fallindSpeed;
       if (!!tracker && !app.getComponent('renderPosition')) {
         const localPlayer = useLocalPlayer();
         localMatrix
@@ -853,6 +846,7 @@ export default (e) => {
                                 pass._selects.push(generator.getMeshes()[0]);
                                 pass.opacity = 0.12;
                                 webaWaterPass = pass;
+                                particleEffect.webaWaterPass = webaWaterPass;
                             }
                             if(pass.constructor.name === 'WebaverseRenderPass'){
                                 pass.foamDepthMaterial = depthMaterial;
@@ -871,6 +865,7 @@ export default (e) => {
                                 );
                                 generator.getMeshes()[0].material.uniforms.tDudv.value = dudvMap2;
                                 generator.getMeshes()[0].material.uniforms.tDepth.value = renderTarget.texture;
+                                particleEffect.foamPass = foamPass;
                             }
                         }
                         alreadySetComposer = true;
@@ -920,42 +915,39 @@ export default (e) => {
                 tempDir.normalize();
                 const detectDistance = 0.3;
                 if(count % 2 === 0){
-                    localVector01.set(tempPhysicsPos.x + tempDir.x * detectDistance, tempPhysicsPos.y + tempDir.y * detectDistance, tempPhysicsPos.z + tempDir.z * detectDistance);
-                    localVector05.set(tempPhysicsPos.x, tempPhysicsPos.y, tempPhysicsPos.z);
-                    localVector06.copy(localVector01).sub(localVector05);
-                    const ds = Math.sqrt(localVector06.x * localVector06.x + localVector06.y * localVector06.y + localVector06.z * localVector06.z) * 2.5;
-                    upVector.crossVectors(localVector01, localVector05);
-                    mx.lookAt(localVector01, localVector05, upVector);
-                    qt.setFromRotationMatrix(mx);
-                    let result = generator.physics.raycast(localVector01, qt);
-                    testContact1 = false;
-                    for(const physicsObject of generator.getPhysicsObjects()){
-                      if(result.objectId === physicsObject.physicsId && result.distance <= ds){
-                        testContact1 = true;
-                        localVector07.set(result.point[0], result.point[1], result.point[2]);
-                      }
-                      generator.physics.disableGeometryQueries(physicsObject)
+                  localVector01.set(tempPhysicsPos.x + tempDir.x * detectDistance, tempPhysicsPos.y + tempDir.y * detectDistance, tempPhysicsPos.z + tempDir.z * detectDistance);
+                  localVector05.set(tempPhysicsPos.x, tempPhysicsPos.y, tempPhysicsPos.z);
+                  localVector06.copy(localVector01).sub(localVector05);
+                  const ds = Math.sqrt(localVector06.x * localVector06.x + localVector06.y * localVector06.y + localVector06.z * localVector06.z) * 2.5;
+                  upVector.crossVectors(localVector01, localVector05);
+                  mx.lookAt(localVector01, localVector05, upVector);
+                  qt.setFromRotationMatrix(mx);
+                  let result = generator.physics.raycast(localVector01, qt);
+                  testContact1 = false;
+                  for(const physicsObject of generator.getPhysicsObjects()){
+                    if(result.objectId === physicsObject.physicsId && result.distance <= ds){
+                      testContact1 = true;
+                      localVector07.set(result.point[0], result.point[1], result.point[2]);
                     }
-                    if(testContact1){
-                      testHDir.copy(localVector01).sub(localVector05).normalize();
-                      if(testHDir.y > 0.85 && localVector07.y > localPlayer.position.y){
-                        // console.log('h', testHDir.y);
-                        waterSurfacePos.copy(localVector07);
-                        particleWaterSurfacePos.copy(localVector07).sub(waterWorldPosition);
-                        if(!playerHighestWaterSurface)
-                            playerHighestWaterSurface = result.point[1];
-                        else
-                            playerHighestWaterSurface = playerHighestWaterSurface < waterSurfacePos.y ? waterSurfacePos.y : playerHighestWaterSurface;
-                        
-                      }
-                      else{
-                        waterSurfacePos.y = playerHighestWaterSurface;
-                        particleWaterSurfacePos.y = playerHighestWaterSurface - waterWorldPosition.y;
-                      }
-                      
+                    generator.physics.disableGeometryQueries(physicsObject)
+                  }
+                  if(testContact1){
+                    testHDir.copy(localVector01).sub(localVector05).normalize();
+                    if(testHDir.y > 0.85 && localVector07.y > localPlayer.position.y){
+                      // console.log('h', testHDir.y);
+                      waterSurfacePos.copy(localVector07);
+                      particleWaterSurfacePos.copy(localVector07).sub(waterWorldPosition);
+                      if(!playerHighestWaterSurface)
+                          playerHighestWaterSurface = result.point[1];
+                      else
+                          playerHighestWaterSurface = playerHighestWaterSurface < waterSurfacePos.y ? waterSurfacePos.y : playerHighestWaterSurface;
                       
                     }
-                  
+                    else{
+                      waterSurfacePos.y = playerHighestWaterSurface;
+                      particleWaterSurfacePos.y = playerHighestWaterSurface - waterWorldPosition.y;
+                    }
+                  }
                 }
                 else{
                     localVector01.set(tempPhysicsPos.x - tempDir.x * detectDistance, tempPhysicsPos.y - tempDir.y * detectDistance, tempPhysicsPos.z - tempDir.z * detectDistance);
@@ -1004,12 +996,6 @@ export default (e) => {
               contactWater = lastContactWater;
             }
 
-
-            
-            
-            // sphere2.position.copy(particleWaterSurfacePos);
-            // app.updateMatrixWorld();
-            // handle swim action
             if(!contactWater){
                 if(localPlayer.hasAction('swim')){
                     //console.log('remove');
@@ -1061,6 +1047,103 @@ export default (e) => {
       }
 
       app.removeEventListener('componentupdate', componentupdate);
+    });
+  }
+  //#################################################################### underwater mask ###################################################################
+  {
+    const geometry = new THREE.PlaneGeometry( 2, 2 );
+    const material= new THREE.ShaderMaterial({
+        uniforms: {
+            uTime: {
+                value: 0,
+            },
+            cameraWaterSurfacePos:{
+                value: new THREE.Vector3()
+            },
+            contactWater:{
+                value: false
+            }
+        },
+        vertexShader: `\
+            ${THREE.ShaderChunk.common}
+            ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+            uniform float uTime;
+            varying vec2 vUv;
+            varying vec3 vPos;
+            
+            void main() {
+                vUv = uv;
+
+                vec3 pos = position;
+                vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+                vec4 viewPosition = viewMatrix * modelPosition;
+                vec4 projectionPosition = projectionMatrix * viewPosition;
+        
+                gl_Position = projectionPosition;
+                vPos = modelPosition.xyz;
+                ${THREE.ShaderChunk.logdepthbuf_vertex}
+            }
+        `,
+        fragmentShader: `\
+            ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
+            uniform float uTime;
+            uniform bool contactWater;
+            uniform vec3 cameraWaterSurfacePos;
+            
+            varying vec2 vUv;
+            varying vec3 vPos;
+            
+            void main() {
+                gl_FragColor = vec4(0.0141, 0.235, 0.25, 0.7);
+                if(!contactWater || vPos.y > cameraWaterSurfacePos.y)
+                    discard;
+            ${THREE.ShaderChunk.logdepthbuf_fragment}
+            }
+        `,
+        side: THREE.DoubleSide,
+        transparent: true,
+        //blending: THREE.AdditiveBlending,
+        depthWrite: false,
+    });
+    const mask = new THREE.Mesh( geometry, material );
+    //app.add( mask );
+    // camera.add(mask);
+    let cameraHasMask = false;
+    let alreadySetComposer = false;
+    useFrame(({timestamp}) => {
+        if(!alreadySetComposer && foamPass && renderSettings.findRenderSettings(scene)){
+            renderSettings.findRenderSettings(scene).fog.color.r = 4 / 255;
+            renderSettings.findRenderSettings(scene).fog.color.g = 41.5 / 255;
+            renderSettings.findRenderSettings(scene).fog.color.b = 44.5 / 255;
+            foamPass.foamInvisibleList.push(mask);
+            alreadySetComposer = true;
+        } 
+        mask.position.set(0, 0, -0.2);
+        mask.material.uniforms.uTime.value = timestamp / 1000;
+        mask.material.uniforms.cameraWaterSurfacePos.value.copy(waterSurfacePos);
+        mask.material.uniforms.contactWater.value = contactWater;
+        if(camera.position.y + 0.03 < waterSurfacePos.y && contactWater){
+            if(renderSettings.findRenderSettings(scene)){
+                renderSettings.findRenderSettings(scene).fog.density = 0.05;
+            }
+        }
+        else{
+            if(renderSettings.findRenderSettings(scene)){
+                renderSettings.findRenderSettings(scene).fog.density = 0;
+            }    
+        }
+        if(camera.position.y - 0.03 < waterSurfacePos.y && contactWater){
+            if(!cameraHasMask){
+                camera.add(mask);
+                cameraHasMask = true;
+            } 
+        }
+        else{   
+            if(cameraHasMask){
+                camera.remove(mask);
+                cameraHasMask = false;
+            }  
+        }
     });
   }
  
