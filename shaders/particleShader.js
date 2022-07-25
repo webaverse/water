@@ -74,5 +74,187 @@ const rippleFragment = `\
     }
 `
 
+const lowerSplashVertex = `\
+              
+    ${THREE.ShaderChunk.common}
+    ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+
+
+    uniform float uTime;
+    uniform vec4 cameraBillboardQuaternion;
+
+
+    varying vec2 vUv;
+    varying vec3 vPos;
+    varying vec3 vColor;
+    varying float vOpacity;
+    varying float vBroken;
+    varying float vTextureRotation;
+
+    attribute float textureRotation;
+    attribute float broken;
+    attribute vec3 positions;
+    attribute vec3 color;
+    attribute float scales;
+    attribute float opacity;
+
+
+    vec3 rotateVecQuat(vec3 position, vec4 q) {
+        vec3 v = position.xyz;
+        return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+    }
+    void main() {
+        vUv = uv;
+        vBroken = broken;
+        vTextureRotation = textureRotation;  
+        // vOpacity = opacity;
+        // vColor = color;
+        
+        vec3 pos = position;
+        pos = rotateVecQuat(pos, cameraBillboardQuaternion);
+        pos*=scales;
+        pos+=positions;
+        //pos = qtransform(pos, quaternions);
+        //pos.y=cos(uTime/100.);
+        vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+        vec4 viewPosition = viewMatrix * modelPosition;
+        vec4 projectionPosition = projectionMatrix * viewPosition;
+        vPos = modelPosition.xyz;
+        gl_Position = projectionPosition;
+        ${THREE.ShaderChunk.logdepthbuf_vertex}
+    }
+`
+const lowerSplashFragment = `\
+    ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
+    uniform float uTime;
+    uniform sampler2D splashTexture;
+    uniform sampler2D noiseMap;
+    uniform vec3 waterSurfacePos;
+    varying vec2 vUv;
+    varying vec3 vPos;
+    varying vec3 vColor;
+    varying float vOpacity;
+    varying float vTextureRotation;
+    varying float vBroken;
+    #define PI 3.1415926
+    void main() {
+        float mid = 0.5;
+        vec2 rotated = vec2(cos(vTextureRotation*PI) * (vUv.x - mid) * 1.1 - sin(vTextureRotation*PI) * (vUv.y - mid) * 1.1 + mid,
+                    cos(vTextureRotation*PI) * (vUv.y - mid) * 1.1 + sin(vTextureRotation*PI) * (vUv.x - mid) * 1.1 + mid);
+        vec4 splash = texture2D(
+                        splashTexture,
+                        rotated
+        );
+        if(splash.r > 0.1){
+            gl_FragColor = vec4(0.9, 0.9, 0.9, 1.0);
+        }
+        if(vPos.y < waterSurfacePos.y){
+            gl_FragColor.a = 0.;
+        }
+        //gl_FragColor.a *= 0.5;
+        float broken = abs( sin( 1.0 - vBroken ) ) - texture2D( noiseMap, rotated * 2.5 ).g;
+        if ( broken < 0.0001 ) discard;
+        if(gl_FragColor.a > 0.){
+            gl_FragColor = vec4(0.9, 0.9, 0.9, 1.0);
+        }
+        else{
+            discard;
+        }
+    ${THREE.ShaderChunk.logdepthbuf_fragment}
+    }
+`
+const higherSplashVertex = `\
+              
+    ${THREE.ShaderChunk.common}
+    ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+
+    
+    uniform float uTime;
+    uniform vec4 cameraBillboardQuaternion;
+    
+    
+    varying vec2 vUv;
+    varying vec3 vPos;
+    varying vec3 vColor;
+    varying float vOpacity;
+    varying float vBroken;
+    varying float vTextureRotation;
+
+    attribute float textureRotation;
+    attribute float broken;
+    attribute vec3 positions;
+    attribute vec3 color;
+    attribute float scales;
+    attribute float opacity;
+    
+    
+    vec3 rotateVecQuat(vec3 position, vec4 q) {
+        vec3 v = position.xyz;
+        return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+    }
+    void main() {
+        vUv = uv;
+        vBroken = broken;
+        vTextureRotation = textureRotation;  
+        // vOpacity = opacity;
+        // vColor = color;
+        
+        vec3 pos = position;
+        pos = rotateVecQuat(pos, cameraBillboardQuaternion);
+        pos*=scales;
+        pos+=positions;
+        //pos = qtransform(pos, quaternions);
+        //pos.y=cos(uTime/100.);
+        vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+        vec4 viewPosition = viewMatrix * modelPosition;
+        vec4 projectionPosition = projectionMatrix * viewPosition;
+        vPos = modelPosition.xyz;
+        gl_Position = projectionPosition;
+        ${THREE.ShaderChunk.logdepthbuf_vertex}
+    }
+`
+const higherSplashFragment = `\
+    ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
+    uniform float uTime;
+    uniform sampler2D splashTexture;
+    uniform sampler2D noiseMap;
+    uniform vec3 waterSurfacePos;
+    varying vec2 vUv;
+    varying vec3 vPos;
+    varying vec3 vColor;
+    varying float vOpacity;
+    varying float vTextureRotation;
+    varying float vBroken;
+    #define PI 3.1415926
+    void main() {
+        float mid = 0.5;
+        vec2 rotated = vec2(cos(vTextureRotation*PI) * (vUv.x - mid) * 1.1 - sin(vTextureRotation*PI) * (vUv.y - mid) * 1.1 + mid,
+                    cos(vTextureRotation*PI) * (vUv.y - mid) * 1.1 + sin(vTextureRotation*PI) * (vUv.x - mid) * 1.1 + mid);
+        vec4 splash = texture2D(
+                        splashTexture,
+                        rotated
+        );
+        if(splash.r > vBroken){
+            gl_FragColor = vec4(0.9, 0.9, 0.9, 1.0);
+        }
+        else{
+            discard;
+        }
+        if(vPos.y < waterSurfacePos.y){
+            gl_FragColor.a = 0.;
+        }
+        //gl_FragColor.a *= 0.5;
+        // float broken = abs( sin( 1.0 - vBroken ) ) - texture2D( noiseMap, rotated * 1. ).g;
+        // if ( broken < 0.0001 ) discard;
+        if(gl_FragColor.a > 0.){
+            gl_FragColor = vec4(0.9, 0.9, 0.9, 1.0);
+        }
+        else{
+            discard;
+        }
+    ${THREE.ShaderChunk.logdepthbuf_fragment}
+    }
+`
+
 	
-export {rippleVertex, rippleFragment};
+export {rippleVertex, rippleFragment, lowerSplashVertex, lowerSplashFragment, higherSplashVertex, higherSplashFragment};

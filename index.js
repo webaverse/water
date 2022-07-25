@@ -23,9 +23,6 @@ const {
   // useLodder,
 } = metaversefile;
 
-const sounds = useSound();
-const soundFiles = sounds.getSoundFiles();
-
 const waterWorldPosition = new THREE.Vector3();
 
 let webaWaterPass = null;
@@ -33,28 +30,12 @@ let foamPass = null;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const textureLoader = new THREE.TextureLoader();
-const bubbleTexture1 = textureLoader.load(`${baseUrl}/textures/Bubble3.png`);
-const bubbleTexture2 = textureLoader.load(`${baseUrl}/textures/Bubble2.png`);
-const noiseCircleTexture = textureLoader.load(`${baseUrl}/textures/noiseCircle.png`);
-// const noiseTexture = textureLoader.load(`${baseUrl}/textures/perlin-noise.jpg`);
-// const noiseTexture2 = textureLoader.load(`${baseUrl}/textures/noise.jpg`);
-const voronoiNoiseTexture = textureLoader.load(`${baseUrl}/textures/voronoiNoise.jpg`);
-voronoiNoiseTexture.wrapS = voronoiNoiseTexture.wrapT = THREE.RepeatWrapping;
-const noiseMap = textureLoader.load(`${baseUrl}/textures/noise.jpg`);
-noiseMap.wrapS = noiseMap.wrapT = THREE.RepeatWrapping;
+
 const dudvMap = textureLoader.load(`${baseUrl}/textures/dudvMap.png`);
 dudvMap.wrapS = dudvMap.wrapT = THREE.RepeatWrapping;
 const dudvMap2 = textureLoader.load(`${baseUrl}/textures/dudvMap2.png`);
 dudvMap2.wrapS = dudvMap2.wrapT = THREE.RepeatWrapping;
-const noiseMap3 = textureLoader.load(`${baseUrl}/textures/noise3.png`);
-const maskTexture = textureLoader.load(`${baseUrl}/textures/mask.png`);
-const splashTexture = textureLoader.load(`${baseUrl}/textures/splash1.png`);
-const splashTexture2 = textureLoader.load(`${baseUrl}/textures/splash2.png`);
-// const splashTexture4 = textureLoader.load(`${baseUrl}/textures/splash.png`);
-const rippleTexture = textureLoader.load(`${baseUrl}/textures/ripple3.png`);
-rippleTexture.wrapS = rippleTexture.wrapT = THREE.RepeatWrapping;
-const rippleTexture2 = textureLoader.load(`${baseUrl}/textures/ripple2.png`);
-rippleTexture2.wrapS = rippleTexture2.wrapT = THREE.RepeatWrapping;
+
 
 const waterNormalTexture1 = textureLoader.load(`${baseUrl}/textures/waterNormal2.png`);
 waterNormalTexture1.wrapS = waterNormalTexture1.wrapT = THREE.RepeatWrapping;
@@ -62,16 +43,7 @@ const waterNormalTexture2 = textureLoader.load(`${baseUrl}/textures/waterNormal3
 waterNormalTexture2.wrapS = waterNormalTexture2.wrapT = THREE.RepeatWrapping;
 
 
-const waterDerivativeHeightTexture = textureLoader.load(`${baseUrl}/textures/water-derivative-height.png`);
-waterDerivativeHeightTexture.wrapS = waterDerivativeHeightTexture.wrapT = THREE.RepeatWrapping;
-const waterNormalTexture = textureLoader.load(`${baseUrl}/textures/water-normal.png`);
-waterNormalTexture.wrapS = waterNormalTexture.wrapT = THREE.RepeatWrapping;
-const waterNoiseTexture = textureLoader.load(`${baseUrl}/textures/perlin-noise.jpg`);
-waterNoiseTexture.wrapS = waterNoiseTexture.wrapT = THREE.RepeatWrapping;
-const waterNoiseTexture2 = textureLoader.load(`${baseUrl}/textures/water.png`);
-waterNoiseTexture2.wrapS = waterNoiseTexture2.wrapT = THREE.RepeatWrapping;
-const flowmapTexture = textureLoader.load(`${baseUrl}/textures/flowmap.png`);
-flowmapTexture.wrapS = flowmapTexture.wrapT = THREE.RepeatWrapping;
+
 //
 const localVector = new THREE.Vector3();
 const localVector2 = new THREE.Vector3();
@@ -639,7 +611,7 @@ export default (e) => {
   const minLodRange = app.getComponent('minLodRange') ?? defaultMinLodRange;
   const debug = app.getComponent('debug') ?? false;
 
-  const particleEffect = new ParticleEffect(app, localPlayer);
+  const particleEffect = new ParticleEffect(app, localPlayer, camera);
 
   const waterSurfacePos = new THREE.Vector3(0, 0, 0);
   const particleWaterSurfacePos = new THREE.Vector3(0, 0, 0);
@@ -829,6 +801,7 @@ export default (e) => {
       particleEffect.particlePosition.set(localPlayer.position.x - waterWorldPosition.x, waterSurfacePos.y - waterWorldPosition.y, localPlayer.position.z - waterWorldPosition.z);
       particleEffect.contactWater = contactWater;
       particleEffect.fallindSpeed = fallindSpeed;
+      particleEffect.waterSurfacePos.copy(waterSurfacePos);
       if (!!tracker && !app.getComponent('renderPosition')) {
         const localPlayer = useLocalPlayer();
         localMatrix
