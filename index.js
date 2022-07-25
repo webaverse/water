@@ -962,7 +962,6 @@ export default (e) => {
                     if(testContact1){
                       testHDir.copy(localVector01).sub(localVector05).normalize();
                       if(testHDir.y > 0.85 && localVector07.y > localPlayer.position.y){
-                        
                         console.log('h', testHDir.y);
                         waterSurfacePos.copy(localVector07);
                         particleWaterSurfacePos.copy(localVector07).sub(waterWorldPosition);
@@ -1001,7 +1000,6 @@ export default (e) => {
                     if(testContact2){
                       testHDir.copy(localVector01).sub(localVector05).normalize();
                       if(testHDir.y < -0.85 && localVector07.y > localPlayer.position.y - localPlayer.avatar.height * 0.5){
-                        
                         console.log('h2', testHDir.y);
                         waterSurfacePos.copy(localVector07);
                         particleWaterSurfacePos.copy(localVector07).sub(waterWorldPosition);
@@ -1042,6 +1040,7 @@ export default (e) => {
                 }
             }
             else{
+              if(playerHighestWaterSurface){
                 if(waterSurfacePos.y >= localPlayer.position.y - localPlayer.avatar.height + localPlayer.avatar.height * 0.8){
                     if(!localPlayer.hasAction('swim')){
                         //console.log('add');
@@ -1070,6 +1069,8 @@ export default (e) => {
                         localPlayer.removeAction('swim');
                     }
                 }
+              }
+                
             }         
         }
       }
