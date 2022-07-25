@@ -1,7 +1,7 @@
 import metaversefile from 'metaversefile';
 // import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
-import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
+import ParticleEffect from './particle.js';
 // import { terrainVertex, terrainFragment } from './shaders/terrainShader.js';
 // import biomeSpecs from './biomes.js';
 
@@ -170,6 +170,9 @@ class WaterMesh extends BatchedMesh {
           },
           waterNormalTexture2:{
             value:waterNormalTexture2
+          },
+          waterWorldPosition:{
+            value: new THREE.Vector3()
           }
         },
         vertexShader: `\
@@ -205,6 +208,8 @@ class WaterMesh extends BatchedMesh {
             uniform float uTime;
             uniform vec3 sunPosition;
             uniform vec3 sunDirection;
+            uniform vec3 waterWorldPosition;
+            
 
             uniform sampler2D tDepth;
             uniform sampler2D tDudv;
@@ -245,7 +250,7 @@ class WaterMesh extends BatchedMesh {
                 vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
                 vec3 diffuseLight = vec3(1.0);
                 vec3 specularLight = vec3(0.1, 0.6, 0.6);
-                vec3 worldToEye = worldPosition.xyz;
+                vec3 worldToEye = worldPosition.xyz - waterWorldPosition;
                 vec3 eyeDirection = normalize( worldToEye );
                 sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );
                 float distance = length(worldToEye);
@@ -634,6 +639,8 @@ export default (e) => {
   const minLodRange = app.getComponent('minLodRange') ?? defaultMinLodRange;
   const debug = app.getComponent('debug') ?? false;
 
+  const particleEffect = new ParticleEffect(app, localPlayer);
+
   const waterSurfacePos = new THREE.Vector3(0, 0, 0);
   const particleWaterSurfacePos = new THREE.Vector3(0, 0, 0);
   const cameraWaterSurfacePos = new THREE.Vector3(0, 0, 0);
@@ -663,6 +670,7 @@ export default (e) => {
             currentSpeed = localVector.set(localPlayer.avatar.velocity.x, 0, localPlayer.avatar.velocity.z).length();
             playerHeadPos.setFromMatrixPosition(localPlayer.avatar.modelBoneOutputs.Head.matrixWorld);
         }
+       
         
         
     });
@@ -799,40 +807,7 @@ export default (e) => {
 
     let alreadySetComposer = false;
 
-    const rayCastByEliminatingChunk = (generator, result, ds, testVector, quaternion, targetPhysics) =>{
-        let maxCheck = 5;
-        let physicsList = [];
-        for(let i = 0; i < maxCheck; i++){
-            if(result.distance <= ds){
-                let dummy = metaversefile.getPhysicsObjectByPhysicsId(result.objectId);
-                if(dummy){
-                    physicsList.push(dummy);
-                }
-                for(const p of physicsList){
-                    generator.physics.disableGeometryQueries(p);
-                }
-                result = generator.physics.raycast(testVector, quaternion);
-                for(const p of physicsList){
-                    if(metaversefile.getAppByPhysicsId(p.physicsId).name !== 'water')
-                        generator.physics.enableGeometryQueries(p);
-                }
-                if(result){
-                    if(result.objectId === targetPhysics.physicsId && result.distance <= ds){
-                        return true;
-                    }
-                }
-                else{
-                    return false;
-                } 
-            }
-            else{
-                return false;
-            }
-            if(i === maxCheck - 1){
-                return false;
-            }
-        }
-    }
+    
     
     const pixelRatio = renderer.getPixelRatio();
   
@@ -860,6 +835,7 @@ export default (e) => {
     const testHDir = new THREE.Vector3();
 
     useFrame(({timestamp, timeDiff}) => {
+      particleEffect.update(waterWorldPosition);
       if (!!tracker && !app.getComponent('renderPosition')) {
         const localPlayer = useLocalPlayer();
         localMatrix
@@ -905,6 +881,7 @@ export default (e) => {
                     webaWaterPass.ssrMaterial.uniforms.distortionTexture.value = dudvMap;
                 }
                 generator.getMeshes()[0].material.uniforms.uTime.value = timestamp / 1000;
+                generator.getMeshes()[0].material.uniforms.waterWorldPosition.value.copy(waterWorldPosition);
             }
             // {
             //   for(const physicsObject of generator.getPhysicsObjects()){
@@ -922,7 +899,7 @@ export default (e) => {
             // }
 
 
-            // check whether in the water
+            // check whether player is in the water
             let min = null;
             tempPhysics = null;
             localVector02.set(localPlayer.position.x, localPlayer.position.y - localPlayer.avatar.height, localPlayer.position.z);
@@ -962,7 +939,7 @@ export default (e) => {
                     if(testContact1){
                       testHDir.copy(localVector01).sub(localVector05).normalize();
                       if(testHDir.y > 0.85 && localVector07.y > localPlayer.position.y){
-                        console.log('h', testHDir.y);
+                        // console.log('h', testHDir.y);
                         waterSurfacePos.copy(localVector07);
                         particleWaterSurfacePos.copy(localVector07).sub(waterWorldPosition);
                         if(!playerHighestWaterSurface)
@@ -1000,7 +977,7 @@ export default (e) => {
                     if(testContact2){
                       testHDir.copy(localVector01).sub(localVector05).normalize();
                       if(testHDir.y < -0.85 && localVector07.y > localPlayer.position.y - localPlayer.avatar.height * 0.5){
-                        console.log('h2', testHDir.y);
+                        // console.log('h2', testHDir.y);
                         waterSurfacePos.copy(localVector07);
                         particleWaterSurfacePos.copy(localVector07).sub(waterWorldPosition);
                         if(!playerHighestWaterSurface)
@@ -1030,8 +1007,8 @@ export default (e) => {
 
             
             
-            sphere2.position.copy(particleWaterSurfacePos);
-            app.updateMatrixWorld();
+            // sphere2.position.copy(particleWaterSurfacePos);
+            // app.updateMatrixWorld();
             // handle swim action
             if(!contactWater){
                 if(localPlayer.hasAction('swim')){
