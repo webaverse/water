@@ -368,9 +368,11 @@ class WaterMesh extends BatchedMesh {
         geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
         const physicsMesh = new THREE.Mesh(geometry, fakeMaterial);
 
-        geometryBuffer = await this.physics.cookGeometryAsync(physicsMesh, {
-          signal,
-        });
+        // geometryBuffer = await this.physics.cookGeometryAsync(physicsMesh, {
+        //   signal,
+        // });
+
+        geometryBuffer = this.physics.cookConvexGeometry(physicsMesh);
       }
       return new ChunkRenderData(meshData, geometryBuffer);
     } else {
@@ -473,12 +475,20 @@ class WaterMesh extends BatchedMesh {
 
       const _handlePhysics = async () => {
         this.matrixWorld.decompose(localVector, localQuaternion, localVector2);
-        const physicsObject = this.physics.addCookedGeometry(
+
+        const physicsObject = this.physics.addCookedConvexGeometry(
           geometryBuffer,
           localVector,
           localQuaternion,
           localVector2
         );
+
+        // const geometry = new THREE.ConeGeometry( 5, 10, 3 ); // ok, is convex
+        // const material = new THREE.MeshStandardMaterial( {color: 'gray'} );
+        // const physicsConvex = new THREE.Mesh( geometry, material );
+        // const dynamic = false;
+        // const physicsObject = this.physics.addConvexGeometry(physicsConvex, dynamic);
+
         const result = this.physics.setTrigger(physicsObject.physicsId);
         console.log('setTrigger', result)
         this.physicsObjects.push(physicsObject);
