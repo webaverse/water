@@ -6,6 +6,7 @@ import { higherSplashVertex, higherSplashFragment } from './shaders/particleShad
 import { dropletVertex, dropletFragment } from './shaders/particleShader.js';
 import { dropletRippleVertex, dropletRippleFragment } from './shaders/particleShader.js';
 import { floatingSplashVertex, floatingSplashFragment } from './shaders/particleShader.js';
+import { swimmingSplashVertex, swimmingSplashFragment } from './shaders/particleShader.js';
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const {
@@ -92,10 +93,49 @@ class ParticleEffect{
         this.floatingSplash = null;
         this.initFloatingSplash();
 
-		
+        this.swimmingSplash = null;
+        this.initSwimmingSplash();
+        this.localVector2 = new THREE.Vector3();
+        this.rotateY = new THREE.Quaternion();
+        this.rotateY.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+        this.lastStroke = null;
+        this.lastStep = null;
+
+        this.swimmingRipple = null;
+        this.initSwimmingRipple();
+
+
+        this.cameraDir = new THREE.Vector3();
+        this.playerDir = new THREE.Vector3();
+        this.playerHeadPos = new THREE.Vector3();
+        this.currentSpeed = 0;
+        this.fallindSpeed = 0;
+
+		this.localVector3 = new THREE.Vector3();
+        this.localVector4 = new THREE.Vector3();
+        this.localVector5 = new THREE.Vector3();
 
 	}
+    tracePlayerInfo(){
+        //############################################################# trace camera player direction and speed ########################################################################
+        this.localVector3.set(0, 0, -1);
+        this.cameraDir = this.localVector3.applyQuaternion( this.camera.quaternion );
+        this.cameraDir.normalize();
+
+        this.localVector4.set(0, 0, -1);
+        this.playerDir = this.localVector4.applyQuaternion( this.player.quaternion );
+        this.playerDir.normalize();
+        
+        this.fallindSpeed = 0 - this.player.characterPhysics.velocity.y;
+        if(this.player.avatar){
+            this.currentSpeed = this.localVector5.set(this.player.avatar.velocity.x, 0, this.player.avatar.velocity.z).length();
+            this.playerHeadPos.setFromMatrixPosition(this.player.avatar.modelBoneOutputs.Head.matrixWorld);
+        }
+    }
     update(timestamp){
+        this.tracePlayerInfo();
+
+        
         if(!this.alreadySetComposer){
             if(this.foamPass && this.webaWaterPass && this.rippleMesh){
                 this.webaWaterPass._selects.push(this.rippleMesh);
@@ -395,6 +435,177 @@ class ParticleEffect{
         }
         _handleFloatingSplash();
 
+
+        const _handleSwimmingSplash = () =>{
+            this.localVector2.set(this.playerDir.x, this.playerDir.y, this.playerDir.z).applyQuaternion(this.rotateY);
+            if(this.swimmingSplash){ 
+                
+                const brokenAttribute = this.swimmingSplash.geometry.getAttribute('broken');
+                const positionsAttribute = this.swimmingSplash.geometry.getAttribute('positions');
+                const scalesAttribute = this.swimmingSplash.geometry.getAttribute('scales');
+                const textureRotationAttribute = this.swimmingSplash.geometry.getAttribute('textureRotation');
+                const particleCount = this.swimmingSplash.info.particleCount;
+                if(this.player.hasAction('swim')){
+                    if(
+                        this.player.getAction('swim').onSurface
+                        && !this.player.hasAction('fly')
+                    ){
+                        if(
+                            this.player.getAction('swim').animationType === 'freestyle'
+                        ){
+                            if(this.player.characterSfx.currentSwimmingHand !== this.lastStroke){
+                                let currentEmmit = 0;
+                                for(let i = 0; i < particleCount; i++){
+                                    if(brokenAttribute.getX(i) >= 1){
+                                        if(this.player.characterSfx.currentSwimmingHand === 'right'){
+                                            this.swimmingSplash.info.velocity[i].x = (Math.random() - 0.5) * 0.1 + this.playerDir.x * 0.45 * (1 + this.currentSpeed) + this.localVector2.x * 0.1;
+                                            this.swimmingSplash.info.velocity[i].y = 0.18 + Math.random() * 0.18;
+                                            this.swimmingSplash.info.velocity[i].z = (Math.random() - 0.5) * 0.1 + this.playerDir.z * 0.45 * (1 + this.currentSpeed) + this.localVector2.z * 0.1;
+                                        }
+                                        else{
+                                            this.swimmingSplash.info.velocity[i].x = (Math.random() - 0.5) * 0.1 + this.playerDir.x * 0.45 * (1 + this.currentSpeed) - this.localVector2.x * 0.1;
+                                            this.swimmingSplash.info.velocity[i].y = 0.18 + Math.random() * 0.18;
+                                            this.swimmingSplash.info.velocity[i].z = (Math.random() - 0.5) * 0.1 + this.playerDir.z * 0.45 * (1 + this.currentSpeed)  - this.localVector2.z * 0.1;
+                                        }
+                                        
+                                        positionsAttribute.setXYZ(  i, 
+                                                                    this.particlePosition.x + (Math.random() - 0.5) * 0.1 + this.swimmingSplash.info.velocity[i].x - this.playerDir.x * 0.25,
+                                                                    this.particlePosition.y,
+                                                                    this.particlePosition.z + (Math.random() - 0.5) * 0.1 + this.swimmingSplash.info.velocity[i].z - this.playerDir.z * 0.25
+                                        );
+                                        this.swimmingSplash.info.velocity[i].divideScalar(10);
+                                        this.swimmingSplash.info.acc[i] = -0.001 - this.currentSpeed * 0.0015;
+                                        scalesAttribute.setX(i, 1 + Math.random());
+                                        brokenAttribute.setX(i, 0.25 + Math.random() * 0.2);
+                                        textureRotationAttribute.setX(i, Math.random() * 2);
+                                        currentEmmit++;
+                                    }
+                                    if(currentEmmit >= 50){
+                                        break;
+                                    }
+                                }  
+                            }
+                        }
+                        if(this.currentSpeed > 0.3){
+                            const splashposition = this.player.getAction('swim').animationType === 'breaststroke' ? 0.32 :  0.15;
+                            const splashposition2 = this.player.getAction('swim').animationType === 'breaststroke' ? 0.1 : 0.2;
+                            let currentEmmit = 0;
+                            for(let i = 0; i < particleCount; i++){
+                                if(brokenAttribute.getX(i) >= 1){
+                                    this.swimmingSplash.info.velocity[i].x = this.localVector2.x * (Math.random() - 0.5) * 0.2 + this.playerDir.x * splashposition2 * (1 + this.currentSpeed);
+                                    this.swimmingSplash.info.velocity[i].y = 0.08 + Math.random() * 0.08;
+                                    this.swimmingSplash.info.velocity[i].z = this.localVector2.z * (Math.random() - 0.5) * 0.2 + this.playerDir.z * splashposition2 * (1 + this.currentSpeed);
+                                    positionsAttribute.setXYZ(  i, 
+                                                                this.particlePosition.x + this.swimmingSplash.info.velocity[i].x * 0.5 + this.playerDir.x * splashposition,
+                                                                this.particlePosition.y - 0.1 * Math.random(),
+                                                                this.particlePosition.z + this.swimmingSplash.info.velocity[i].z * 0.5 + this.playerDir.z * splashposition
+                                    );
+                                    this.swimmingSplash.info.velocity[i].divideScalar(5);
+                                    this.swimmingSplash.info.acc[i] = -0.0015 - this.currentSpeed * 0.0015;
+                                    scalesAttribute.setX(i, 2 + Math.random() * 2);
+                                    if(this.player.getAction('swim').animationType === 'breaststroke')
+                                        brokenAttribute.setX(i, 0.2 + Math.random() * 0.2);
+                                    else
+                                        brokenAttribute.setX(i, 0.25 + Math.random() * 0.2);
+                                    textureRotationAttribute.setX(i, Math.random() * 2);
+                                    currentEmmit++;
+                                }
+                                if(currentEmmit >= 2){
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else{
+                    if(this.contactWater){
+                        if(
+                            this.player.characterSfx.currentStep !== this.lastStep 
+                            && (
+                                (this.currentSpeed <= 0.5 && this.waterSurfacePos.y < this.player.position.y - this.player.avatar.height * 0.7)
+                                || (this.currentSpeed > 0.5 && this.waterSurfacePos.y < this.player.position.y - this.player.avatar.height * 0.6)
+                            )
+                        ){
+                            
+                            let currentEmmit = 0;
+                            for(let i = 0; i < particleCount; i++){
+                                if(brokenAttribute.getX(i) >= 1){
+                                    this.swimmingSplash.info.velocity[i].x = (Math.random() - 0.5) * 0.1 * (1 + this.currentSpeed);
+                                    this.swimmingSplash.info.velocity[i].y = 0.2 * (1 + this.currentSpeed);
+                                    this.swimmingSplash.info.velocity[i].z = (Math.random() - 0.5) * 0.1 * (1 + this.currentSpeed);
+                                    if(this.player.characterSfx.currentStep === 'left'){
+                                        positionsAttribute.setXYZ(  i, 
+                                                                    this.particlePosition.x + this.localVector2.x * 0.05 + this.swimmingSplash.info.velocity[i].x + this.playerDir.x * 0.35,
+                                                                    this.particlePosition.y + 0.1 * Math.random(),
+                                                                    this.particlePosition.z + this.localVector2.z * 0.05 + this.swimmingSplash.info.velocity[i].z + this.playerDir.z * 0.35
+                                        );
+                                    }
+                                    else{
+                                        positionsAttribute.setXYZ(  i, 
+                                                                    this.particlePosition.x - this.localVector2.x * 0.05 + this.swimmingSplash.info.velocity[i].x + this.playerDir.x * 0.35,
+                                                                    this.particlePosition.y + 0.1 * Math.random(),
+                                                                    this.particlePosition.z - this.localVector2.z * 0.05 + this.swimmingSplash.info.velocity[i].z + this.playerDir.z * 0.35
+                                        );
+                                    }
+                                    
+                                    this.swimmingSplash.info.velocity[i].divideScalar(10);
+                                    this.swimmingSplash.info.acc[i] = -0.001 - this.currentSpeed * 0.0015;
+                                    scalesAttribute.setX(i, (1 + this.currentSpeed));
+                                    brokenAttribute.setX(i, 0.25 + Math.random() * 0.2);
+                                    textureRotationAttribute.setX(i, Math.random() * 2);
+                                    currentEmmit++;
+                                }
+                                if(currentEmmit >= 50){
+                                    break;
+                                }
+                            }
+                            this.lastStep = this.player.characterSfx.currentStep;
+                        }
+                    }
+                }
+
+                for (let i = 0; i < particleCount; i++){
+                    if(this.currentSpeed < 0.2){
+                        positionsAttribute.setXYZ(  i, 
+                                                positionsAttribute.getX(i),
+                                                positionsAttribute.getY(i) + this.swimmingSplash.info.velocity[i].y,
+                                                positionsAttribute.getZ(i) 
+                        ); 
+                    }
+                    else{
+                        positionsAttribute.setXYZ(  i, 
+                                                positionsAttribute.getX(i) + this.swimmingSplash.info.velocity[i].x,
+                                                positionsAttribute.getY(i) + this.swimmingSplash.info.velocity[i].y,
+                                                positionsAttribute.getZ(i) + this.swimmingSplash.info.velocity[i].z
+                        );
+                    }
+                    
+                    if(brokenAttribute.getX(i) < 1){
+                        if(this.player.hasAction('swim')){
+                            brokenAttribute.setX(i, brokenAttribute.getX(i) + 0.016);
+                            scalesAttribute.setX(i, scalesAttribute.getX(i) + 0.01);
+                        }
+                        else{
+                            brokenAttribute.setX(i, brokenAttribute.getX(i) + 0.01 * (1 + this.currentSpeed));
+                            scalesAttribute.setX(i, scalesAttribute.getX(i) + 0.01 * (1 + this.currentSpeed));
+                        }  
+                    }
+                    this.swimmingSplash.info.velocity[i].y += this.swimmingSplash.info.acc[i];
+                }
+
+
+                brokenAttribute.needsUpdate = true;
+                positionsAttribute.needsUpdate = true;
+                scalesAttribute.needsUpdate = true;
+                textureRotationAttribute.needsUpdate = true;
+                this.swimmingSplash.material.uniforms.uTime.value = timestamp / 1000;
+                this.swimmingSplash.material.uniforms.cameraBillboardQuaternion.value.copy(this.camera.quaternion);
+                this.swimmingSplash.material.uniforms.waterSurfacePos.value.copy(this.waterSurfacePos);
+                this.lastStroke = this.player.characterSfx.currentSwimmingHand;
+            }
+        }
+        _handleSwimmingSplash();
+
         
         this.app.updateMatrixWorld();
         this.lastContactWater = this.contactWater;
@@ -679,6 +890,98 @@ class ParticleEffect{
         }
         quaternionAttribute.needsUpdate = true;
         this.app.add(this.floatingSplash);
+    }
+    initSwimmingSplash(){
+        const particleCount = 200;
+        const attributeSpecs = [];
+        attributeSpecs.push({name: 'scales', itemSize: 1});
+        attributeSpecs.push({name: 'broken', itemSize: 1});
+        attributeSpecs.push({name: 'textureRotation', itemSize: 1});
+        const geometry2 = new THREE.PlaneGeometry(0.1, 0.1);
+        const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
+
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: {
+                    value: 0,
+                },
+                cameraBillboardQuaternion: {
+                    value: new THREE.Quaternion(),
+                },
+                splashTexture: {
+                    value: splashTexture2,
+                },
+                waterSurfacePos: {
+                    value: new THREE.Vector3(),
+                },
+                noiseMap:{
+                    value: noiseMap
+                },
+            },
+            vertexShader: swimmingSplashVertex,
+            fragmentShader: swimmingSplashFragment,
+            side: THREE.DoubleSide,
+            transparent: true,
+        });
+        this.swimmingSplash = new THREE.InstancedMesh(geometry, material, particleCount);
+        
+        this.swimmingSplash.info = {
+            particleCount: particleCount,
+            velocity: [particleCount],
+            acc: [particleCount]
+        }
+        
+        for (let i = 0; i < particleCount; i++) {
+            this.swimmingSplash.info.velocity[i] = new THREE.Vector3();
+        }
+        
+        this.app.add(this.swimmingSplash);
+    }
+    initSwimmingRipple(){
+    //     const particleCount = 30;
+    //     const attributeSpecs = [];
+    //     attributeSpecs.push({name: 'scales', itemSize: 1});
+    //     attributeSpecs.push({name: 'broken', itemSize: 1});
+    //     attributeSpecs.push({name: 'textureRotation', itemSize: 1});
+    //     const geometry2 = new THREE.PlaneGeometry(0.1, 0.1);
+    //     const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
+
+    //     const material = new THREE.ShaderMaterial({
+    //         uniforms: {
+    //             uTime: {
+    //                 value: 0,
+    //             },
+    //             cameraBillboardQuaternion: {
+    //                 value: new THREE.Quaternion(),
+    //             },
+    //             splashTexture: {
+    //                 value: splashTexture2,
+    //             },
+    //             waterSurfacePos: {
+    //                 value: new THREE.Vector3(),
+    //             },
+    //             noiseMap:{
+    //                 value: noiseMap
+    //             },
+    //         },
+    //         vertexShader: swimmingSplashVertex,
+    //         fragmentShader: swimmingSplashFragment,
+    //         side: THREE.DoubleSide,
+    //         transparent: true,
+    //     });
+    //     this.swimmingSplash = new THREE.InstancedMesh(geometry, material, particleCount);
+        
+    //     this.swimmingSplash.info = {
+    //         particleCount: particleCount,
+    //         velocity: [particleCount],
+    //         acc: [particleCount]
+    //     }
+        
+    //     for (let i = 0; i < particleCount; i++) {
+    //         this.swimmingSplash.info.velocity[i] = new THREE.Vector3();
+    //     }
+        
+    //     this.app.add(this.swimmingSplash);
     }
     
     _getGeometry = (geometry, attributeSpecs, particleCount) => {
