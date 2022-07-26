@@ -91,6 +91,7 @@ class ParticleEffect{
 
         
         this.rippleMesh = null;
+        this.rippleGroupInApp = false;
         this.initRipple();
 
         this.floatingSplash = null;
@@ -165,6 +166,10 @@ class ParticleEffect{
                         this.rippleMesh.material.uniforms.vBroken.value = 0.1;
                         this.rippleMesh.scale.set(0.2, 1, 0.2);
                         this.rippleMesh.material.uniforms.uTime.value = 120;
+                        if(!this.rippleGroupInApp){
+                            this.app.add(this.rippleGroup);
+                            this.rippleGroupInApp = true;
+                        }
                     }
                     
                 }
@@ -744,8 +749,8 @@ class ParticleEffect{
                                                 positionsAttribute.getZ(i) + this.bubble.info.velocity[i].z
                     );
                     this.bubble.info.startTime[i] = this.bubble.info.startTime[i] + 1;
-                    if(this.bubble.info.startTime[i] % 2 === 0)
-                        this.bubble.info.offset[i] += 1;
+                    // if(this.bubble.info.startTime[i] % 2 === 0)
+                    this.bubble.info.offset[i] += 3;
                     if(this.bubble.info.offset[i] >= 30){
                         this.bubble.info.offset[i] = 0;
                     }
@@ -787,7 +792,7 @@ class ParticleEffect{
             this.rippleGroup.add(splashMeshApp.scene)
             this.rippleMesh = splashMeshApp.scene.children[0];
             this.rippleMesh.scale.set(0, 0, 0);
-            this.app.add(this.rippleGroup);
+            // this.app.add(this.rippleGroup);
             
             this.rippleMesh.material = new THREE.ShaderMaterial({
                 uniforms: {
