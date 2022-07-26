@@ -566,6 +566,189 @@ const swimmingSplashFragment = `\
     }
 `
 
+const swimmingRippleVertex = `\       
+    ${THREE.ShaderChunk.common}
+    ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+
+
+    uniform float uTime;
+
+    varying vec2 vUv;
+    varying vec3 vPos;
+    varying float vBroken;
+    varying float vSpeed;
+    varying float vRand;
+
+
+    attribute float textureRotation;
+    attribute vec3 positions;
+    attribute float scales;
+    attribute float random;
+    attribute vec4 quaternions;
+    attribute float broken;
+    attribute float speed;
+    attribute float playerRotation;
+    vec3 qtransform(vec3 v, vec4 q) { 
+    return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+    }
+
+    void main() {
+        mat3 rotY =
+            mat3(cos(playerRotation), 0.0, -sin(playerRotation), 0.0, 1.0, 0.0, sin(playerRotation), 0.0, cos(playerRotation));   
+    vBroken=broken;
+    vSpeed=speed;
+    vRand=random;
+    vUv=uv;
+    vPos=position;
+    vec3 pos = position;
+    pos = qtransform(pos, quaternions);
+    pos*=rotY;
+    pos*=scales;
+    pos+=positions;
+
+    vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+    vec4 viewPosition = viewMatrix * modelPosition;
+    vec4 projectionPosition = projectionMatrix * viewPosition;
+
+    gl_Position = projectionPosition;
+    ${THREE.ShaderChunk.logdepthbuf_vertex}
+    }
+`
+const swimmingRippleFragment = `\
+    ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
+    uniform float uTime;
+    varying float vBroken;
+    varying float vSpeed;
+    varying float vRand;
+    varying vec2 vUv;
+    varying vec3 vPos;
+    uniform sampler2D noiseMap;
+    uniform sampler2D noiseMap2;
+
+    const float rFrequency = 10.0; 
+    const float rSpeed = .08;
+    const float rThickness = 50.0;
+    const float radiusEnd = .45;
+    const float radiusStart = .08;
+    const float PI = 3.1415926535897932384626433832795;
+
+    float radialNoise(vec2 uv){ 
+        uv.y -= rSpeed*uTime;
+        const int octaves = 2;
+        const float scale = .15;   
+        float power = 2.2;
+        float total = 0.0;
+        for(int i = 0; i<octaves; i++){
+            total += texture2D(noiseMap, uv * (power * scale) + vRand * 0.5).r * (1.0 / power);
+            power *=2.0;
+        }
+        return total;
+    }
+
+    void main() {
+        vec2 uv = vUv;
+        vec2 center= vec2(.5, .5);
+        vec2 toCenter = uv-center;
+        float dist = length(toCenter);
+        float distScalar = max(0.0,1.0 - dist/radiusEnd);
+        float ripple = sin((dist-rSpeed)*rFrequency);
+        ripple = max(0.0,ripple);
+        ripple = pow(ripple,rThickness);
+        ripple = (dist>radiusStart) ? ripple*distScalar : 0.0;
+        float angle = atan(toCenter.x,toCenter.y);
+        angle = (angle + PI) / (2.0 * PI);
+        float noise = radialNoise(vec2(angle,dist));
+        float total = ripple;
+        total -= noise;
+        total = total < (vRand * 0.5) / 10. ? 0.0 : 1.0;
+        gl_FragColor = vec4(total);
+        float mid = 0.5;
+        vec2 rotated = vec2(cos(vRand * 2. * PI) * (vUv.x - mid) * 1. - sin(vRand * 2. * PI) * (vUv.y - mid) * 1. + mid,
+                    cos(vRand * 2. * PI) * (vUv.y - mid) * 1. + sin(vRand * 2. * PI) * (vUv.x - mid) * 1. + mid);
+        if(vSpeed > 0.1){
+            if(vUv.y < 0.45){
+                discard;
+            }
+        }    
+        vec3 noise2 = texture2D(
+                            noiseMap2,
+                            rotated
+        ).rgb;
+        float broken = abs( sin( 1.0 - vBroken ) ) - noise2.g;
+        if ( broken < 0.0001 ) discard;
+        if(gl_FragColor.a <= 0.){
+            discard;
+        }
+        else{
+            gl_FragColor = vec4(0.9, 0.9, 0.9, 1.0);
+        }
+    ${THREE.ShaderChunk.logdepthbuf_fragment}
+    }
+`
+
+const bubbleVertex = `\         
+    ${THREE.ShaderChunk.common}
+    ${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+
+
+    uniform float uTime;
+    uniform vec4 cameraBillboardQuaternion;
+
+
+    varying vec2 vUv;
+    varying vec3 vPos;
+    varying vec3 vColor;
+    varying vec2 vOffset;
+
+    attribute vec3 positions;
+    attribute vec3 color;
+    attribute float scales;
+    attribute vec2 offset;
+
+    vec3 rotateVecQuat(vec3 position, vec4 q) {
+        vec3 v = position.xyz;
+        return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+    }
+    void main() {
+        vUv = uv;
+        vPos = position;
+        vOffset = offset;
+        vec3 pos = position;
+        pos = rotateVecQuat(pos, cameraBillboardQuaternion);
+        pos*=scales;
+        pos+=positions;
+        vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+        vec4 viewPosition = viewMatrix * modelPosition;
+        vec4 projectionPosition = projectionMatrix * viewPosition;
+
+        gl_Position = projectionPosition;
+        ${THREE.ShaderChunk.logdepthbuf_vertex}
+    }
+`
+const bubbleFragment = `\
+    ${THREE.ShaderChunk.logdepthbuf_pars_fragment}
+    uniform float uTime;
+    uniform sampler2D bubbleTexture1;
+    varying vec2 vUv;
+    varying vec3 vPos;
+    varying vec2 vOffset;
+    void main() {
+        vec4 bubble = texture2D(
+                        bubbleTexture1,
+                        vec2(
+                            vUv.x / 6. + vOffset.x,
+                            vUv.y / 5. + vOffset.y
+                        )
+        );
+        
+        gl_FragColor = bubble;
+        if(gl_FragColor.a < 0.25){
+            discard;
+        }
+    ${THREE.ShaderChunk.logdepthbuf_fragment}
+}
+`
+
 	
 export {
     rippleVertex, rippleFragment, 
@@ -574,5 +757,7 @@ export {
     dropletVertex, dropletFragment, 
     dropletRippleVertex, dropletRippleFragment,
     floatingSplashVertex, floatingSplashFragment,
-    swimmingSplashVertex, swimmingSplashFragment
+    swimmingSplashVertex, swimmingSplashFragment,
+    swimmingRippleVertex, swimmingRippleFragment,
+    bubbleVertex, bubbleFragment
 };

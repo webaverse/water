@@ -7,6 +7,9 @@ import { dropletVertex, dropletFragment } from './shaders/particleShader.js';
 import { dropletRippleVertex, dropletRippleFragment } from './shaders/particleShader.js';
 import { floatingSplashVertex, floatingSplashFragment } from './shaders/particleShader.js';
 import { swimmingSplashVertex, swimmingSplashFragment } from './shaders/particleShader.js';
+import { swimmingRippleVertex, swimmingRippleFragment } from './shaders/particleShader.js';
+import { bubbleVertex, bubbleFragment } from './shaders/particleShader.js';
+
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const {
@@ -104,10 +107,14 @@ class ParticleEffect{
         this.swimmingRipple = null;
         this.initSwimmingRipple();
 
+        this.bubble = null;
+        this.initBubble();
+
 
         this.cameraDir = new THREE.Vector3();
         this.playerDir = new THREE.Vector3();
         this.playerHeadPos = new THREE.Vector3();
+        this.waterWorldPosition = new THREE.Vector3();
         this.currentSpeed = 0;
         this.fallindSpeed = 0;
 
@@ -606,6 +613,164 @@ class ParticleEffect{
         }
         _handleSwimmingSplash();
 
+        const _handleSwimmingRipple = () =>{
+            const particleCount = this.swimmingRipple.info.particleCount;
+            if(this.swimmingRipple.info.currentIndex >= particleCount){
+                this.swimmingRipple.info.currentIndex = 0;
+            }
+            if (this.swimmingRipple) {
+                const brokenAttribute = this.swimmingRipple.geometry.getAttribute('broken');
+                const positionsAttribute = this.swimmingRipple.geometry.getAttribute('positions');
+                const scalesAttribute = this.swimmingRipple.geometry.getAttribute('scales');
+                const speedAttribute = this.swimmingRipple.geometry.getAttribute('speed');
+                const playerRotationAttribute = this.swimmingRipple.geometry.getAttribute('playerRotation');
+                const randAttribute = this.swimmingRipple.geometry.getAttribute('random');
+                for (let i = 0; i < particleCount; i++) {
+                    scalesAttribute.setX(i,scalesAttribute.getX(i) + 0.1 * (this.currentSpeed + 0.3));
+                    if(brokenAttribute.getX(i) < 1)
+                        brokenAttribute.setX(i, brokenAttribute.getX(i) + 0.01);
+                }
+                if(timestamp - this.swimmingRipple.info.lastEmmitTime > 150 * Math.pow((1.1 - this.currentSpeed), 0.3)  && this.currentSpeed > 0.005 && this.contactWater){
+                    if(
+                        (this.player.hasAction('swim') && this.player.getAction('swim').onSurface)
+                        ||(!this.player.hasAction('swim') && this.waterSurfacePos.y >= this.player.position.y - this.player.avatar.height * 0.7)
+                    ){
+                        if(this.player.rotation.x !== 0){
+                            playerRotationAttribute.setX(this.swimmingRipple.info.currentIndex, Math.PI + this.player.rotation.y);
+                        }
+                        else{
+                            playerRotationAttribute.setX(this.swimmingRipple.info.currentIndex, -this.player.rotation.y);
+                        }
+                        speedAttribute.setX(this.swimmingRipple.info.currentIndex, this.currentSpeed);
+                        brokenAttribute.setX(this.swimmingRipple.info.currentIndex, 0.1);
+                        scalesAttribute.setX(this.swimmingRipple.info.currentIndex, 1.5 + Math.random() * 0.1);
+                        if(this.currentSpeed > 0.1){
+                            positionsAttribute.setXYZ(
+                                this.swimmingRipple.info.currentIndex,
+                                this.particlePosition.x + 0.25 * this.playerDir.x + (Math.random() - 0.5) * 0.1, 
+                                this.particlePosition.y + 0.01, 
+                                this.particlePosition.z + 0.25 * this.playerDir.z + (Math.random() - 0.5) * 0.1
+                            );
+                        }
+                        else{
+                            positionsAttribute.setXYZ(
+                                this.swimmingRipple.info.currentIndex,
+                                this.particlePosition.x - 0.05 * this.playerDir.x, 
+                                this.particlePosition.y + 0.01, 
+                                this.particlePosition.z - 0.05 * this.playerDir.z
+                            );
+                        }
+                        
+                        randAttribute.setX(this.swimmingRipple.info.currentIndex, Math.random());
+                        this.swimmingRipple.info.currentIndex++;
+                        this.swimmingRipple.info.lastEmmitTime=timestamp;
+                    }
+                    
+                }
+                
+                positionsAttribute.needsUpdate = true;
+                randAttribute.needsUpdate = true;
+                scalesAttribute.needsUpdate = true;
+                speedAttribute.needsUpdate = true;
+                brokenAttribute.needsUpdate = true;
+                playerRotationAttribute.needsUpdate = true;
+                this.swimmingRipple.material.uniforms.uTime.value = timestamp / 1000;
+    
+            }
+
+
+                
+            
+        }
+        _handleSwimmingRipple();
+
+        const _handleBubble = () =>{
+            const particleCount = this.bubble.info.particleCount;
+            if(this.bubble && this.player.avatar){
+                let currentEmmit = 0;
+                const offsetAttribute = this.bubble.geometry.getAttribute('offset');
+                const positionsAttribute = this.bubble.geometry.getAttribute('positions');
+                const scalesAttribute = this.bubble.geometry.getAttribute('scales');
+                if(timestamp - this.bubble.info.lastEmmitTime > 100 && this.contactWater){
+                    for (let i = 0; i < (Math.floor(this.currentSpeed * 10 + 1) * 5); i++){
+                        if(scalesAttribute.getX(i) <= 0){
+                            if(this.currentSpeed > 0.1){
+                                this.playerHeadPos.x += (Math.random() - 0.5) * 0.5;
+                                this.playerHeadPos.y += (Math.random() - 0.5) * 0.2;
+                                this.playerHeadPos.z += (Math.random() - 0.5) * 0.5;
+                                this.bubble.info.velocity[i].x = -this.playerDir.x * 0.005;
+                                this.bubble.info.velocity[i].y = 0.0025 + Math.random() * 0.0025;
+                                this.bubble.info.velocity[i].z = -this.playerDir.z * 0.005;
+                            }
+                            else{
+                                this.playerHeadPos.x += -this.playerDir.x * 0.25;
+                                this.playerHeadPos.z += -this.playerDir.z * 0.25;
+                                this.playerHeadPos.x += (Math.random() - 0.5) * 0.5;
+                                this.playerHeadPos.z += (Math.random() - 0.5) * 0.5;
+                                this.playerHeadPos.y -= this.player.avatar.height * 0.6;
+                                this.playerHeadPos.y += (Math.random()) * 0.2
+                                this.bubble.info.velocity[i].x = 0;
+                                this.bubble.info.velocity[i].y = 0.0025 + Math.random() * 0.0025;
+                                this.bubble.info.velocity[i].z = 0;
+                                
+                            }
+                            if(this.playerHeadPos.y > this.waterSurfacePos.y)
+                                this.playerHeadPos.y = this.particlePosition.y;
+                            positionsAttribute.setXYZ(i, this.playerHeadPos.x - this.waterWorldPosition.x, this.playerHeadPos.y - this.waterWorldPosition.y, this.playerHeadPos.z - this.waterWorldPosition.z);
+                            
+                            this.bubble.info.offset[i] = Math.floor(Math.random() * 29);
+                            this.bubble.info.lastTime[i] = (50 + Math.random() * 50);
+                            this.bubble.info.startTime[i] = 0;
+                            scalesAttribute.setX(i, Math.random());
+                            if(this.currentSpeed <= 0.1 && !this.player.hasAction('swim')){
+                                scalesAttribute.setX(i, 0);
+                            }
+                            currentEmmit++;
+                        }
+                        if(currentEmmit > this.bubble.info.maxEmmit){
+                            this.bubble.info.lastEmmitTime = timestamp;
+                            break;
+                        }
+                        
+                    }
+                }
+                for (let i = 0; i < particleCount; i++){
+                    if(positionsAttribute.getY(i) >= this.particlePosition.y - 0.005){
+                        this.bubble.info.velocity[i].y = 0;
+                    }
+                    positionsAttribute.setXYZ(  i, 
+                                                positionsAttribute.getX(i) + this.bubble.info.velocity[i].x,
+                                                positionsAttribute.getY(i) + this.bubble.info.velocity[i].y,
+                                                positionsAttribute.getZ(i) + this.bubble.info.velocity[i].z
+                    );
+                    this.bubble.info.startTime[i] = this.bubble.info.startTime[i] + 1;
+                    if(this.bubble.info.startTime[i] % 2 === 0)
+                        this.bubble.info.offset[i] += 1;
+                    if(this.bubble.info.offset[i] >= 30){
+                        this.bubble.info.offset[i] = 0;
+                    }
+                    offsetAttribute.setXY(i, (5 / 6) - Math.floor(this.bubble.info.offset[i] / 6) * (1. / 6.), Math.floor(this.bubble.info.offset[i] % 5) * 0.2);
+                    if(scalesAttribute.getX(i) > 0)
+                        scalesAttribute.setX(i, scalesAttribute.getX(i) + 0.01);
+                    if(this.bubble.info.startTime[i] > this.bubble.info.lastTime[i] || positionsAttribute.getY(i) > this.particlePosition.y){
+                        scalesAttribute.setX(i, 0);
+                    }
+                }
+
+
+                positionsAttribute.needsUpdate = true;
+                scalesAttribute.needsUpdate = true;
+                offsetAttribute.needsUpdate = true;
+               
+                this.bubble.material.uniforms.uTime.value = timestamp / 1000;
+                this.bubble.material.uniforms.cameraBillboardQuaternion.value.copy(this.camera.quaternion);
+            }
+            
+                
+            
+        }
+        _handleBubble();
+
         
         this.app.updateMatrixWorld();
         this.lastContactWater = this.contactWater;
@@ -938,50 +1103,104 @@ class ParticleEffect{
         this.app.add(this.swimmingSplash);
     }
     initSwimmingRipple(){
-    //     const particleCount = 30;
-    //     const attributeSpecs = [];
-    //     attributeSpecs.push({name: 'scales', itemSize: 1});
-    //     attributeSpecs.push({name: 'broken', itemSize: 1});
-    //     attributeSpecs.push({name: 'textureRotation', itemSize: 1});
-    //     const geometry2 = new THREE.PlaneGeometry(0.1, 0.1);
-    //     const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
+        const particleCount = 30;
+        const attributeSpecs = [];
+        attributeSpecs.push({name: 'scales', itemSize: 1});
+        attributeSpecs.push({name: 'broken', itemSize: 1});
+        attributeSpecs.push({name: 'random', itemSize: 1});
+        attributeSpecs.push({name: 'playerRotation', itemSize: 1});
+        attributeSpecs.push({name: 'speed', itemSize: 1});
+        const geometry2 = new THREE.PlaneGeometry(0.5, 0.5);
+        const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
 
-    //     const material = new THREE.ShaderMaterial({
-    //         uniforms: {
-    //             uTime: {
-    //                 value: 0,
-    //             },
-    //             cameraBillboardQuaternion: {
-    //                 value: new THREE.Quaternion(),
-    //             },
-    //             splashTexture: {
-    //                 value: splashTexture2,
-    //             },
-    //             waterSurfacePos: {
-    //                 value: new THREE.Vector3(),
-    //             },
-    //             noiseMap:{
-    //                 value: noiseMap
-    //             },
-    //         },
-    //         vertexShader: swimmingSplashVertex,
-    //         fragmentShader: swimmingSplashFragment,
-    //         side: THREE.DoubleSide,
-    //         transparent: true,
-    //     });
-    //     this.swimmingSplash = new THREE.InstancedMesh(geometry, material, particleCount);
+        const quaternions = new Float32Array(particleCount * 4);
+        const identityQuaternion = new THREE.Quaternion();
+        for (let i = 0; i < particleCount; i++) {
+            identityQuaternion.toArray(quaternions, i * 4);
+        }
+        const quaternionsAttribute = new THREE.InstancedBufferAttribute(quaternions, 4);
+        geometry.setAttribute('quaternions', quaternionsAttribute);
+
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: {
+                    value: 0,
+                },
+                noiseMap:{
+                    value: noiseMap3
+                },
+                noiseMap2:{
+                    value: noiseMap
+                }
+            },
+            vertexShader: swimmingRippleVertex,
+            fragmentShader: swimmingRippleFragment,
+            side: THREE.DoubleSide,
+            transparent: true,
+        });
+        this.swimmingRipple = new THREE.InstancedMesh(geometry, material, particleCount);
         
-    //     this.swimmingSplash.info = {
-    //         particleCount: particleCount,
-    //         velocity: [particleCount],
-    //         acc: [particleCount]
-    //     }
+        this.swimmingRipple.info = {
+            particleCount: particleCount,
+            currentIndex: 0,
+            lastEmmitTime: 0,
+        }
+        const euler = new THREE.Euler(-Math.PI / 2, 0, 0);
+        const quaternion = new THREE.Quaternion();
+        const quaternionAttribute =  this.swimmingRipple.geometry.getAttribute('quaternions');
+        for (let i = 0; i < particleCount; i++) {
+            quaternion.setFromEuler(euler);
+            quaternionAttribute.setXYZW(i, quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+        }
+        quaternionAttribute.needsUpdate = true;
         
-    //     for (let i = 0; i < particleCount; i++) {
-    //         this.swimmingSplash.info.velocity[i] = new THREE.Vector3();
-    //     }
         
-    //     this.app.add(this.swimmingSplash);
+        this.app.add(this.swimmingRipple);
+    }
+    initBubble(){
+        const particleCount = 40;
+        const attributeSpecs = [];
+        attributeSpecs.push({name: 'scales', itemSize: 1});
+        attributeSpecs.push({name: 'offset', itemSize: 1});
+        const geometry2 = new THREE.PlaneGeometry(0.02, 0.02);
+        const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
+
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: {
+                    value: 0,
+                },
+                cameraBillboardQuaternion: {
+                    value: new THREE.Quaternion(),
+                },
+                bubbleTexture1: {
+                    value: bubbleTexture1,
+                },
+            },
+            vertexShader: bubbleVertex,
+            fragmentShader: bubbleFragment,
+            side: THREE.DoubleSide,
+            transparent: true,
+        });
+        this.bubble = new THREE.InstancedMesh(geometry, material, particleCount);
+        
+        this.bubble.info = {
+            particleCount: particleCount,
+            maxEmmit: 5,
+            lastEmmitTime: 0,
+            velocity: [particleCount],
+            offset: [particleCount],
+            startTime:[particleCount],
+            lastTime:[particleCount]
+        }
+        
+        for (let i = 0; i < particleCount; i++) {
+            this.bubble.info.velocity[i] = new THREE.Vector3();
+        }
+        
+        
+        
+        this.app.add(this.bubble);
     }
     
     _getGeometry = (geometry, attributeSpecs, particleCount) => {
