@@ -197,10 +197,10 @@ class WaterMesh extends BatchedMesh {
                 return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
             }  
             vec4 getNoise( vec2 uv ) {
-                vec2 uv0 = ( uv / 103.0 ) + vec2(uTime / 34.0, uTime / 58.0);
-                vec2 uv1 = uv / 107.0-vec2( uTime / -38.0, uTime / 64.0 );
-                vec2 uv2 = uv / vec2( 8907.0, 9803.0 ) + vec2( uTime / 202.0, uTime / 194.0 );
-                vec2 uv3 = uv / vec2( 1091.0, 1027.0 ) - vec2( uTime / 218.0, uTime / -226.0 );
+                vec2 uv0 = ( uv / 103.0 ) + vec2(uTime / 25.5, uTime / 43.5);
+                vec2 uv1 = uv / 107.0-vec2( uTime / -28.5, uTime / 48.0 );
+                vec2 uv2 = uv / vec2( 8907.0, 9803.0 ) + vec2( uTime / 151.5, uTime / 145.5 );
+                vec2 uv3 = uv / vec2( 1091.0, 1027.0 ) - vec2( uTime / 163.5, uTime / -469.5 );
                 vec4 noise = texture2D( waterNormalTexture1, uv0 ) +
                     texture2D( waterNormalTexture1, uv1 ) +
                     texture2D( waterNormalTexture2, uv2 ) +
@@ -214,7 +214,7 @@ class WaterMesh extends BatchedMesh {
                 diffuseColor += max( dot( sunDirection, surfaceNormal ), 0.0 ) * vec3(0.3, 0.3, 0.3) * diffuse;
             }
             void main() {
-                vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 );
+                vec4 worldPosition = modelMatrix * vec4( vPos, 1.0 ) * 2.;
                 vec4 noise = getNoise( worldPosition.xz * 2.);
                 vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
                 vec3 diffuseLight = vec3(1.0);
@@ -225,7 +225,7 @@ class WaterMesh extends BatchedMesh {
                 float distance = length(worldToEye);
                 float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
                 
-                vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) * 0.25 ) * vec3(0.5, 0.5, 0.5);
+                vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) * 0.5 ) * vec3(0.5, 0.5, 0.5);
                 vec3 albedo = ( vec3(0.3, 0.3, 0.3) * diffuseLight * 0.025 + scatter );
                 vec3 outgoingLight = albedo;
                 gl_FragColor = (vec4( outgoingLight, 0.95 )) + vec4(0.0282, 0.470, 0.431, 0.);
