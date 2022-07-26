@@ -14,7 +14,7 @@ import { bubbleVertex, bubbleFragment } from './shaders/particleShader.js';
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const {
     useLoaders,
-    useSound
+    useSound,
 } = metaversefile;
 const sounds = useSound();
 const soundFiles = sounds.getSoundFiles(); 
@@ -122,6 +122,7 @@ class ParticleEffect{
 		this.localVector3 = new THREE.Vector3();
         this.localVector4 = new THREE.Vector3();
         this.localVector5 = new THREE.Vector3();
+        
 
 	}
     tracePlayerInfo(){
@@ -748,9 +749,9 @@ class ParticleEffect{
                                                 positionsAttribute.getY(i) + this.bubble.info.velocity[i].y,
                                                 positionsAttribute.getZ(i) + this.bubble.info.velocity[i].z
                     );
-                    this.bubble.info.startTime[i] = this.bubble.info.startTime[i] + 1;
-                    // if(this.bubble.info.startTime[i] % 2 === 0)
-                    this.bubble.info.offset[i] += 3;
+                    this.bubble.info.startTime[i]++;
+                    if(this.bubble.info.startTime[i] % 2 === 0)
+                        this.bubble.info.offset[i] += 1;
                     if(this.bubble.info.offset[i] >= 30){
                         this.bubble.info.offset[i] = 0;
                     }
@@ -767,7 +768,7 @@ class ParticleEffect{
                 scalesAttribute.needsUpdate = true;
                 offsetAttribute.needsUpdate = true;
                
-                this.bubble.material.uniforms.uTime.value = timestamp / 1000;
+                // this.bubble.material.uniforms.uTime.value = timestamp / 1000;
                 this.bubble.material.uniforms.cameraBillboardQuaternion.value.copy(this.camera.quaternion);
             }
             
@@ -924,7 +925,7 @@ class ParticleEffect{
         const particleCount = 50;
         const attributeSpecs = [];
         attributeSpecs.push({name: 'scales', itemSize: 1});
-        attributeSpecs.push({name: 'offset', itemSize: 1});
+        attributeSpecs.push({name: 'offset', itemSize: 2});
         const geometry2 = new THREE.PlaneGeometry(0.1, 0.1);
         const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
         const material= new THREE.ShaderMaterial({
@@ -1166,7 +1167,7 @@ class ParticleEffect{
         const particleCount = 40;
         const attributeSpecs = [];
         attributeSpecs.push({name: 'scales', itemSize: 1});
-        attributeSpecs.push({name: 'offset', itemSize: 1});
+        attributeSpecs.push({name: 'offset', itemSize: 2});
         const geometry2 = new THREE.PlaneGeometry(0.02, 0.02);
         const geometry = this._getGeometry(geometry2, attributeSpecs, particleCount);
 
@@ -1202,8 +1203,6 @@ class ParticleEffect{
         for (let i = 0; i < particleCount; i++) {
             this.bubble.info.velocity[i] = new THREE.Vector3();
         }
-        
-        
         
         this.app.add(this.bubble);
     }
