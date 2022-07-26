@@ -35,8 +35,6 @@ const dudvMap = textureLoader.load(`${baseUrl}/textures/dudvMap.png`);
 dudvMap.wrapS = dudvMap.wrapT = THREE.RepeatWrapping;
 const dudvMap2 = textureLoader.load(`${baseUrl}/textures/dudvMap2.png`);
 dudvMap2.wrapS = dudvMap2.wrapT = THREE.RepeatWrapping;
-const bubbleTexture1 = textureLoader.load(`${baseUrl}/textures/Bubble3.png`);
-const bubbleTexture2 = textureLoader.load(`${baseUrl}/textures/Bubble2.png`);
 
 const waterNormalTexture1 = textureLoader.load(`${baseUrl}/textures/waterNormal2.png`);
 waterNormalTexture1.wrapS = waterNormalTexture1.wrapT = THREE.RepeatWrapping;
@@ -45,9 +43,7 @@ waterNormalTexture2.wrapS = waterNormalTexture2.wrapT = THREE.RepeatWrapping;
 
 const noiseMap = textureLoader.load(`${baseUrl}/textures/noise.jpg`);
 noiseMap.wrapS = noiseMap.wrapT = THREE.RepeatWrapping;
-const splashTexture = textureLoader.load(`${baseUrl}/textures/splash1.png`);
-const splashTexture2 = textureLoader.load(`${baseUrl}/textures/splash2.png`);
-const noiseMap3 = textureLoader.load(`${baseUrl}/textures/noise3.png`);
+
 
 //
 const localVector = new THREE.Vector3();
