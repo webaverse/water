@@ -479,6 +479,8 @@ class WaterMesh extends BatchedMesh {
           localQuaternion,
           localVector2
         );
+        const result = this.physics.setTrigger(physicsObject.physicsId);
+        console.log('setTrigger', result)
         this.physicsObjects.push(physicsObject);
         this.physicsObjectToChunkMap.set(physicsObject, chunk);
         
@@ -722,6 +724,19 @@ export default (e) => {
   const renderSettings = useRenderSettings();
   const physics = usePhysics();
   const procGenManager = useProcGenManager();
+
+  app.addEventListener('triggerin', event => {
+    console.log('repo: triggerin: ', event.myPhysicsId, event.oppositePhysicsId);
+    if (localPlayer.characterController && event.oppositePhysicsId === localPlayer.characterController.physicsId) {
+      // physicsConvex.material.color.set('cyan');
+    }
+  });
+  app.addEventListener('triggerout', event => {
+    console.log('repo: triggerout: ', event.myPhysicsId, event.oppositePhysicsId);
+    if (localPlayer.characterController && event.oppositePhysicsId === localPlayer.characterController.physicsId) {
+      // physicsConvex.material.color.set('gray');
+    }
+  });
 
   const seed = app.getComponent('seed') ?? null;
   let range = app.getComponent('range') ?? null;
