@@ -335,6 +335,7 @@ class WaterMesh extends BatchedMesh {
 
     this.procGenInstance = procGenInstance;
     this.physics = physics;
+    window.repoPhysics2 = physics;
     this.allocator = allocator;
     this.physicsObjects = [];
 
@@ -556,6 +557,7 @@ class WaterChunkGenerator {
     // parameters
     this.procGenInstance = procGenInstance;
     this.physics = physics;
+    window.repoPhysics = physics;
     // this.biomeUvDataTexture = biomeUvDataTexture;
     this.textures = textures;
 
