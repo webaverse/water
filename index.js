@@ -614,16 +614,21 @@ export default (e) => {
   useFrame(({timestamp, timeDiff}) => {
     console.log(triggerCount);
     if (triggerCount <= 0) {
+      if (localPlayer.hasAction('swim')) {
         localPlayer.removeAction('swim');
-    } else if (!localPlayer.hasAction('swim')) {
+      }
+    } else {
+      if (!localPlayer.hasAction('swim')) {
+        // console.log('add swim action')
         const swimAction = {
-            type: 'swim',
-            onSurface: false,
-            swimDamping: 1,
-            animationType: 'breaststroke'
+          type: 'swim',
+          onSurface: false,
+          swimDamping: 1,
+          animationType: 'breaststroke'
         };
-        // localPlayer.setControlAction(swimAction);
-        localPlayer.addAction(swimAction);
+        localPlayer.setControlAction(swimAction);
+        // localPlayer.addAction(swimAction);
+      }
     }
   })
 
@@ -976,7 +981,7 @@ export default (e) => {
             if(!contactWater){
                 if(localPlayer.hasAction('swim')){
                     //console.log('remove');
-                    localPlayer.removeAction('swim');
+                    // localPlayer.removeAction('swim');
                 }
             }
             else{
@@ -1006,7 +1011,7 @@ export default (e) => {
                 else{
                     if(localPlayer.hasAction('swim')){
                         //console.log('remove');
-                        localPlayer.removeAction('swim');
+                        // localPlayer.removeAction('swim');
                     }
                 }
               }
