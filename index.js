@@ -55,6 +55,7 @@ const localMatrix = new THREE.Matrix4();
 const localMatrix2 = new THREE.Matrix4();
 const localSphere = new THREE.Sphere();
 
+let triggerCount = 0;
 
 const procGenManager = useProcGenManager();
 const chunkWorldSize = procGenManager.chunkSize;
@@ -426,7 +427,7 @@ class WaterMesh extends BatchedMesh {
         );
 
         const result = this.physics.setTrigger(physicsObject.physicsId);
-        console.log('setTrigger', result)
+        // console.log('setTrigger', result)
 
         this.physicsObjects.push(physicsObject);
         this.physicsObjectToChunkMap.set(physicsObject, chunk);
@@ -596,17 +597,35 @@ export default (e) => {
   const procGenManager = useProcGenManager();
 
   app.addEventListener('triggerin', event => {
-    console.log('repo: triggerin: ', event.myPhysicsId, event.oppositePhysicsId);
+    // console.log('repo: triggerin: ', event.myPhysicsId, event.oppositePhysicsId);
     if (localPlayer.characterController && event.oppositePhysicsId === localPlayer.characterController.physicsId) {
+        triggerCount++;
       // physicsConvex.material.color.set('cyan');
     }
   });
   app.addEventListener('triggerout', event => {
-    console.log('repo: triggerout: ', event.myPhysicsId, event.oppositePhysicsId);
+    // console.log('repo: triggerout: ', event.myPhysicsId, event.oppositePhysicsId);
     if (localPlayer.characterController && event.oppositePhysicsId === localPlayer.characterController.physicsId) {
+        triggerCount--;
       // physicsConvex.material.color.set('gray');
     }
   });
+
+  useFrame(({timestamp, timeDiff}) => {
+    console.log(triggerCount);
+    if (triggerCount <= 0) {
+        localPlayer.removeAction('swim');
+    } else if (!localPlayer.hasAction('swim')) {
+        const swimAction = {
+            type: 'swim',
+            onSurface: false,
+            swimDamping: 1,
+            animationType: 'breaststroke'
+        };
+        // localPlayer.setControlAction(swimAction);
+        localPlayer.addAction(swimAction);
+    }
+  })
 
   const seed = app.getComponent('seed') ?? null;
   let range = app.getComponent('range') ?? null;
