@@ -425,14 +425,9 @@ class WaterMesh extends BatchedMesh {
           localVector2
         );
 
-        // const geometry = new THREE.ConeGeometry( 5, 10, 3 ); // ok, is convex
-        // const material = new THREE.MeshStandardMaterial( {color: 'gray'} );
-        // const physicsConvex = new THREE.Mesh( geometry, material );
-        // const dynamic = false;
-        // const physicsObject = this.physics.addConvexGeometry(physicsConvex, dynamic);
-
         const result = this.physics.setTrigger(physicsObject.physicsId);
         console.log('setTrigger', result)
+
         this.physicsObjects.push(physicsObject);
         this.physicsObjectToChunkMap.set(physicsObject, chunk);
         
@@ -477,7 +472,7 @@ class WaterMesh extends BatchedMesh {
       _handlePhysics();
     }
   }
-  /* updateCoord(min2xCoord) {
+  updateCoord(min2xCoord) {
     // XXX only do this on light mapper update
     // XXX needs to apply to the terrain mesh too, though the terrain mesh is driving the lighting (maybe rethink this)
     // XXX create a new lighting app which tracks the lighting only
