@@ -255,7 +255,7 @@ class WaterMesh extends BatchedMesh {
                 
     
                 ${THREE.ShaderChunk.logdepthbuf_fragment}
-                gl_FragColor.a *= 0.5;
+                gl_FragColor.a *= 0.8;
             }
         `,
         side: THREE.DoubleSide,
@@ -613,7 +613,7 @@ export default (e) => {
   });
 
   useFrame(({timestamp, timeDiff}) => {
-    console.log(triggerCount);
+    // console.log(triggerCount);
     if (triggerCount <= 0) {
       if (localPlayer.hasAction('swim')) {
         localPlayer.removeAction('swim');
