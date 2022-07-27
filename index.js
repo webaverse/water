@@ -1177,7 +1177,7 @@ export default (e) => {
                             swimDamping: 1,
                             animationType: 'breaststroke'
                         };
-                        localPlayer.setControlAction(swimAction);
+                        // localPlayer.setControlAction(swimAction);
                     }
     
                     if(waterSurfacePos.y < localPlayer.position.y - localPlayer.avatar.height + localPlayer.avatar.height * 0.85){
