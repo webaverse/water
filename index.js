@@ -251,10 +251,11 @@ class WaterMesh extends BatchedMesh {
                     // diff += displacement.x;
             
                     gl_FragColor = mix( vec4(1.0, 1.0, 1.0, gl_FragColor.a), gl_FragColor, step( 0.05, diff ) );
-                }
+                  }
                 
     
                 ${THREE.ShaderChunk.logdepthbuf_fragment}
+                gl_FragColor.a *= 0.5;
             }
         `,
         side: THREE.DoubleSide,
@@ -1057,7 +1058,7 @@ export default (e) => {
     });
   }
   //#################################################################### underwater mask ###################################################################
-  {
+  if (0) {
     const geometry = new THREE.PlaneGeometry( 2, 2 );
     const material= new THREE.ShaderMaterial({
         uniforms: {
