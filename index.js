@@ -26,6 +26,7 @@ const sounds = useSound();
 const soundFiles = sounds.getSoundFiles();
 
 let reflectionSsrPass = null;
+let foamPass = null;
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const textureLoader = new THREE.TextureLoader();
@@ -214,6 +215,24 @@ class WaterMesh extends BatchedMesh {
           flowmapTexture: {
             value: flowmapTexture
           },
+          threshold: {
+            value: 0.1
+          },
+          tDudv: {
+            value: null
+          },
+          tDepth: {
+            value: null
+          },
+          cameraNear: {
+            value: 0
+          },
+          cameraFar: {
+            value: 0
+          },
+          resolution: {
+            value: new THREE.Vector2()
+          },
         },
         vertexShader: `\
             
@@ -260,7 +279,20 @@ class WaterMesh extends BatchedMesh {
   
             varying vec2 vUv;
             varying vec3 vPos;
-            
+            uniform sampler2D tDepth;
+            uniform sampler2D tDudv;
+            uniform float cameraNear;
+            uniform float cameraFar;
+            uniform float threshold;
+            uniform vec2 resolution;
+  
+            float getDepth( const in vec2 screenPosition ) {
+                return unpackRGBAToDepth( texture2D( tDepth, screenPosition ) );
+            }
+  
+            float getViewZ( const in float depth ) {
+                return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
+            }
             float frac(float v)
             {
                 return v - floor(v);
@@ -314,6 +346,30 @@ class WaterMesh extends BatchedMesh {
               gl_FragColor.rgb /= 3.;
               gl_FragColor += vec4( specularHighlight, 0.0 );
 
+
+
+
+              // foam
+              vec2 screenUV = gl_FragCoord.xy / resolution;
+  
+              float fragmentLinearEyeDepth = getViewZ( gl_FragCoord.z );
+              float linearEyeDepth = getViewZ( getDepth( screenUV ) );
+      
+              float diff = saturate( fragmentLinearEyeDepth - linearEyeDepth );
+              if(diff > 0.){
+                vec2 channelA = texture2D( tDudv, vec2(0.25 * worldPosition.x + uTime * 0.04, 0.5 * worldPosition.z - uTime * 0.03) ).rg;
+				vec2 channelB = texture2D( tDudv, vec2(0.5 * worldPosition.x - uTime * 0.05, 0.35 * worldPosition.z + uTime * 0.04) ).rg;
+                vec2 displacement = (channelA + channelB) * 0.5;
+                displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
+                diff += displacement.x;
+
+
+                // vec2 displacement = texture2D( tDudv, ( worldPosition.xz * 1.0 ) - uTime * 0.05 ).rg;
+                // displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
+                // diff += displacement.x;
+        
+                gl_FragColor = mix( vec4(1.0, 1.0, 1.0, gl_FragColor.a), gl_FragColor, step( 0.05, diff ) );
+              }
               
               
               ${THREE.ShaderChunk.logdepthbuf_fragment}
@@ -960,6 +1016,20 @@ export default (e) => {
         }
     }
     
+    const pixelRatio = renderer.getPixelRatio();
+  
+    const renderTarget = new THREE.WebGLRenderTarget(
+      window.innerWidth * pixelRatio,
+      window.innerHeight * pixelRatio
+    );
+    renderTarget.texture.minFilter = THREE.NearestFilter;
+    renderTarget.texture.magFilter = THREE.NearestFilter;
+    renderTarget.texture.generateMipmaps = false;
+    renderTarget.stencilBuffer = false;
+  
+    const depthMaterial = new THREE.MeshDepthMaterial();
+    depthMaterial.depthPacking = THREE.RGBADepthPacking;
+    depthMaterial.blending = THREE.NoBlending;
 
     useFrame(({timestamp, timeDiff}) => {
       if (!!tracker && !app.getComponent('renderPosition')) {
@@ -977,6 +1047,17 @@ export default (e) => {
                             pass._selects.push(generator.getMeshes()[0]);
                             pass.opacity = 0.12;
                             reflectionSsrPass = pass;
+                        }
+                        if(pass.constructor.name === 'WebaverseRenderPass'){
+                            pass.foamDepthMaterial = depthMaterial;
+                            pass.foamRenderTarget = renderTarget;
+                            pass.water = generator.getMeshes()[0];
+                            pass.scene = scene;
+                            pass.camera = camera;
+                            pass.foamInvisibleList.push(localPlayer.avatar.app);
+                            pass.foamInvisibleList.push(generator.getMeshes()[0]);
+                            foamPass = pass;
+                            console.log(pass);
                         }
                     }
                     alreadySetComposer = true;
@@ -1214,6 +1295,18 @@ export default (e) => {
             generator.getMeshes()[0].material.uniforms.uTime.value = timestamp / 1000;
             generator.getMeshes()[0].material.uniforms.playerPosition.value.copy(localPlayer.position);
             generator.getMeshes()[0].material.uniforms.playerDirection.value.copy(playerDir);
+
+            
+            generator.getMeshes()[0].material.uniforms.cameraNear.value = camera.near;
+            generator.getMeshes()[0].material.uniforms.cameraFar.value = camera.far;
+            generator.getMeshes()[0].material.uniforms.resolution.value.set(
+                window.innerWidth * window.devicePixelRatio,
+                window.innerHeight * window.devicePixelRatio
+            );
+            generator.getMeshes()[0].material.uniforms.tDudv.value = dudvMap2;
+            generator.getMeshes()[0].material.uniforms.tDepth.value = renderTarget.texture;
+                
+                
         }
       }
       count++;
@@ -1305,10 +1398,11 @@ export default (e) => {
     let cameraHasMask = false;
     let alreadySetComposer = false;
     useFrame(({timestamp}) => {
-        if(!alreadySetComposer && renderSettings.findRenderSettings(scene)){
+        if(!alreadySetComposer && foamPass && renderSettings.findRenderSettings(scene)){
             renderSettings.findRenderSettings(scene).fog.color.r = 4 / 255;
             renderSettings.findRenderSettings(scene).fog.color.g = 41.5 / 255;
             renderSettings.findRenderSettings(scene).fog.color.b = 44.5 / 255;
+            foamPass.foamInvisibleList.push(mask);
             alreadySetComposer = true;
         }
        
@@ -4818,8 +4912,9 @@ export default (e) => {
     let alreadySetComposer = false;
     useFrame(({timestamp}) => {
         if(!alreadySetComposer){
-            if(splashMesh && reflectionSsrPass){
+            if(splashMesh && reflectionSsrPass && foamPass){
                 reflectionSsrPass._selects.push(splashMesh);
+                foamPass.foamInvisibleList.push(splashMesh);
                 alreadySetComposer = true;
             }
         }
